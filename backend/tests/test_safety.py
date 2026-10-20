@@ -12,6 +12,7 @@ from carechat.safety import Verdict, keyword_check, screen
         "my dad can't breathe properly",
         "her face is drooping and she has slurred speech",
         "I think I took an overdose of my pills",
+        "mere papa ko chest pain ho raha hai",
         "the bleeding won't stop",
         "my throat is closing after eating peanuts",
         "worst headache of my life",
@@ -46,3 +47,12 @@ async def test_classifier_failure_fails_closed(fake_client):
     request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
     fake_client.safety_error = anthropic.APIConnectionError(request=request)
     assert await screen(["What is HbA1c?"]) is Verdict.UNAVAILABLE
+
+
+def test_region_lookup():
+    from carechat.region import get_region
+
+    assert get_region("in").emergency_number == "112"
+    assert get_region("US").crisis_number == "988"
+    with pytest.raises(ValueError):
+        get_region("XX")

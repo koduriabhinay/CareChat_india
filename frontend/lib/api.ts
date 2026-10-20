@@ -25,7 +25,7 @@ export interface Source {
 }
 
 export type ChatEvent =
-  | { type: "safety"; verdict: "emergency" | "self_harm" | "unavailable"; message: string }
+  | { type: "safety"; verdict: "emergency" | "self_harm" | "unavailable"; message: string; call: string }
   | { type: "sources"; sources: Source[] }
   | { type: "text"; text: string }
   | { type: "replace"; text: string }
@@ -40,6 +40,19 @@ async function errorDetail(res: Response): Promise<string> {
     /* fall through */
   }
   return `Request failed (${res.status}).`;
+}
+
+export interface Health {
+  disclaimer: string;
+  region: string;
+  emergency_number: string;
+  crisis_number: string;
+}
+
+export async function getHealth(): Promise<Health> {
+  const res = await fetch(`${API_URL}/api/health`);
+  if (!res.ok) throw new Error(await errorDetail(res));
+  return res.json();
 }
 
 export async function uploadReport(file: File): Promise<{ report_id: string; report: Report }> {

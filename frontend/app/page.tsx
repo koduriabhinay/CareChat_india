@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import MessageBubble, { type UiMessage } from "@/components/MessageBubble";
 import ReportPanel from "@/components/ReportPanel";
-import { streamChat, type Report } from "@/lib/api";
+import { getHealth, streamChat, type Report } from "@/lib/api";
 
 const SUGGESTIONS_NO_REPORT = [
   "What does an HbA1c test measure?",
@@ -25,7 +25,16 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [reportId, setReportId] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [disclaimer, setDisclaimer] = useState(
+    "For education only, not medical advice. CareChat can't diagnose or treat. In an emergency, call 112.",
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    getHealth()
+      .then((h) => setDisclaimer(h.disclaimer))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -51,7 +60,13 @@ export default function Home() {
       await streamChat(history, reportId, (event) => {
         switch (event.type) {
           case "safety":
-            patch(reply.id, (m) => ({ ...m, content: event.message, alert: event.verdict, pending: false }));
+            patch(reply.id, (m) => ({
+              ...m,
+              content: event.message,
+              alert: event.verdict,
+              call: event.call,
+              pending: false,
+            }));
             break;
           case "sources":
             patch(reply.id, (m) => ({ ...m, sources: event.sources }));
@@ -90,7 +105,7 @@ export default function Home() {
       <header className="pt-5 pb-3">
         <h1 className="text-xl font-semibold text-teal-800 dark:text-teal-400">CareChat</h1>
         <p className="mt-1 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-400">
-          For education only, not medical advice. CareChat can&apos;t diagnose or treat. In an emergency, call 911.
+          {disclaimer}
         </p>
       </header>
 

@@ -29,7 +29,15 @@ SAMPLE = Report(
 
 
 def test_health(api):
-    assert api.get("/api/health").json()["knowledge_passages"] == 1
+    body = api.get("/api/health").json()
+    assert body["knowledge_passages"] == 1
+    assert body["region"] == "IN" and "112" in body["disclaimer"]
+
+
+def test_self_harm_points_to_tele_manas(api):
+    ev = events(api.post("/api/chat", json={"messages": [{"role": "user", "content": "I want to end my life"}]}))
+    assert ev[0]["verdict"] == "self_harm" and ev[0]["call"] == "14416"
+    assert "Tele-MANAS" in ev[0]["message"]
 
 
 def test_chat_streams_answer_with_sources(api, fake_client):
@@ -47,7 +55,7 @@ def test_emergency_never_reaches_answer_model(api, fake_client):
     r = api.post("/api/chat", json={"messages": [{"role": "user", "content": "I have crushing chest pain"}]})
     ev = events(r)
     assert ev[0]["type"] == "safety" and ev[0]["verdict"] == "emergency"
-    assert "911" in ev[0]["message"]
+    assert "112" in ev[0]["message"] and ev[0]["call"] == "112"
     assert all(kind != "answer" for kind, _ in fake_client.calls)
 
 

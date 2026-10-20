@@ -19,6 +19,8 @@ class Settings:
     safety_model: str = field(default_factory=lambda: os.getenv("CARECHAT_SAFETY_MODEL", "claude-haiku-5-5"))
     # Server-side refusal fallbacks (Claude API only; turn off on Bedrock/Vertex).
     use_fallbacks: bool = field(default_factory=lambda: _bool("CARECHAT_USE_FALLBACKS", True))
+    # Launch region: sets emergency numbers and messages. "IN" (India) or "US".
+    region_code: str = field(default_factory=lambda: os.getenv("CARECHAT_REGION", "IN"))
     db_path: str = field(default_factory=lambda: os.getenv("CARECHAT_DB_PATH", "carechat.db"))
     max_upload_bytes: int = field(default_factory=lambda: int(os.getenv("CARECHAT_MAX_UPLOAD_MB", "10")) * 1024 * 1024)
     max_history_messages: int = 20

@@ -8,6 +8,7 @@ export interface UiMessage {
   content: string;
   sources?: Source[];
   alert?: "emergency" | "self_harm" | "unavailable" | "error";
+  call?: string;
   pending?: boolean;
 }
 
@@ -23,7 +24,7 @@ export default function MessageBubble({ message }: { message: UiMessage }) {
   }
 
   if (message.alert === "emergency" || message.alert === "self_harm") {
-    const number = message.alert === "self_harm" ? "988" : "911";
+    const number = message.call ?? "112";
     return (
       <div role="alert" className="rounded-xl border-2 border-red-600 bg-red-50 p-4 dark:bg-red-950/40">
         <p className="font-semibold text-red-800 dark:text-red-300">

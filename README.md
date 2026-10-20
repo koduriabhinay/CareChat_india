@@ -12,8 +12,8 @@ and complete the compliance steps below first.
   range and flag exactly as printed), then explains it in chat.
 - **Answers health questions** from MedlinePlus content, citing sources like `[1]`.
 - **Screens every message first.** A keyword check plus a Claude Haiku classifier catch emergency
-  and self-harm messages. Those get a fixed, human-written message (call 911 or 988) and never
-  reach the answer model. If the screen can't run, CareChat refuses to answer (fails closed).
+  and self-harm messages, including Hindi and Hinglish. Those get a fixed, human-written message
+  (call 112, or Tele-MANAS on 14416) and never reach the answer model. If the screen can't run, CareChat refuses to answer (fails closed).
 - **Stays in scope.** No diagnosis, no medicine or dose advice, no off-topic help.
 
 ## How it fits together
@@ -70,22 +70,37 @@ python -m evals.run_evals safety    # real API: emergency and self-harm detectio
 python -m evals.run_evals scope     # real API: declines diagnosis, dosing, off-topic (Opus judge)
 ```
 
-The evaluation sets are a starter (40 safety cases, 15 scope cases). The plan calls for 200
+The evaluation sets are a starter (46 safety cases including Hindi and Hinglish, 15 scope cases). The plan calls for 200
 red-flag messages and clinician-reviewed answer accuracy before any pilot.
 
 ## Configuration
 
-See `backend/.env.example`. Defaults: answers and report reading use `claude-sonnet-5-5` at effort
+See `backend/.env.example`. The launch region is India (`CARECHAT_REGION=IN`): emergency
+messages use 112 (108 for an ambulance) and Tele-MANAS (14416). `CARECHAT_REGION=US` switches to
+911 and 988. Re-check every number against official sources before launch. Other defaults: answers and report reading use `claude-sonnet-5-5` at effort
 `low` (fast chat), the safety screen uses `claude-haiku-5-5`, and server-side refusal fallbacks
 (`fallbacks: "default"`) are on. Fallbacks work on the Claude API only; set
 `CARECHAT_USE_FALLBACKS=false` on Bedrock or Vertex.
 
-## Before real patients use it
+## Before real patients use it (India launch)
 
-- Sign a BAA with Anthropic (or use Claude through Amazon Bedrock under the AWS BAA) and every other
-  vendor that touches health data.
-- Move storage to an encrypted database (for example Amazon RDS) and add login (Amazon Cognito).
-  The dev SQLite file is not encrypted. Uploaded PDFs are never stored, only extracted results.
-- Swap full-text search for PostgreSQL + pgvector if keyword search proves too weak.
-- Grow and pass the evaluation sets, and have a clinician review answers.
-- Add a consent screen and a "delete my data" flow (report delete exists at `DELETE /api/reports/{id}`).
+These are engineering notes, not legal advice. Have a lawyer familiar with Indian health and data
+law review the launch.
+
+- **DPDP Act 2023 and DPDP Rules 2025.** CareChat is a data fiduciary. It needs a clear consent
+  notice in plain language (and in the user's language), a way to withdraw consent and delete data,
+  breach reporting to the Data Protection Board and affected users, and a named contact for
+  grievances. Users under 18 need verifiable parental consent, so either verify age or block minors.
+- **Hosting.** Use an India region such as AWS Mumbai (ap-south-1). The DPDP Act does not require
+  data to stay in India today, but check where Claude processes requests and record it in the
+  privacy notice. Sign Anthropic's data processing terms.
+- **Stay educational.** Software that diagnoses or recommends treatment can count as a medical
+  device under CDSCO rules, and only registered medical practitioners may give consultations under
+  the Telemedicine Practice Guidelines. CareChat must keep explaining, never diagnosing or
+  prescribing.
+- **Storage and login.** Move to an encrypted database and add login. The dev SQLite file is not
+  encrypted. Uploaded PDFs are never stored, only extracted results.
+- **Content.** MedlinePlus is US content; consider adding Indian public sources and checking that
+  advice fits Indian care settings. Test with real Indian lab report layouts.
+- **Evaluation.** Grow and pass the evaluation sets, with more Hindi and regional-language cases,
+  and have a clinician review answers.

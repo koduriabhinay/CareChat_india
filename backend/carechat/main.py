@@ -14,14 +14,12 @@ from fastapi.responses import StreamingResponse
 from . import chat, reports
 from .config import settings
 from .knowledge import KnowledgeBase
+from .safety import REGION
 from .store import ReportStore
 
 logging.basicConfig(level=logging.INFO)
 
-DISCLAIMER = (
-    "CareChat is for education only and is not medical advice. "
-    "It can't diagnose or treat. In an emergency, call 911."
-)
+DISCLAIMER = REGION.disclaimer
 
 
 @asynccontextmanager
@@ -42,7 +40,14 @@ app.add_middleware(
 
 @app.get("/api/health")
 async def health(request: Request) -> dict:
-    return {"status": "ok", "knowledge_passages": request.app.state.kb.count(), "disclaimer": DISCLAIMER}
+    return {
+        "status": "ok",
+        "knowledge_passages": request.app.state.kb.count(),
+        "disclaimer": DISCLAIMER,
+        "region": REGION.code,
+        "emergency_number": REGION.emergency_number,
+        "crisis_number": REGION.crisis_number,
+    }
 
 
 @app.post("/api/reports")
