@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Literal
 
 import anthropic
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field
 from .config import settings
 from .llm import FALLBACK_BETA, get_client
 from .redact import pdf_text, redact
+from .usage import log_usage
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +49,20 @@ PDF_MAGIC = b"%PDF-"
 MIN_TEXT_CHARS = 40
 
 
+def compact_text(text: str) -> str:
+    """Shrink layout whitespace, which costs tokens but carries no meaning.
+
+    Runs of 2+ spaces (table column gaps) become " | " so columns stay readable,
+    and blank lines and trailing spaces are dropped.
+    """
+    lines = []
+    for line in text.splitlines():
+        line = re.sub(r"[ \t]{2,}", " | ", line.strip())
+        if line:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 class ReportError(Exception):
     """A problem the user can fix, with a message safe to show them."""
 
@@ -75,13 +91,13 @@ async def extract_report(pdf_bytes: bytes) -> Report:
     try:
         response = await get_client().beta.messages.parse(
             model=settings.answer_model,
-            max_tokens=16000,
+            max_tokens=settings.extract_max_tokens,
             system=EXTRACT_SYSTEM,
             output_config={"effort": "low"},
             messages=[
                 {
                     "role": "user",
-                    "content": f"<report_text>\n{redact(text)}\n</report_text>\n\nExtract this report.",
+                    "content": f"<report_text>\n{compact_text(redact(text))}\n</report_text>\n\nExtract this report.",
                 }
             ],
             output_format=Report,
@@ -90,6 +106,7 @@ async def extract_report(pdf_bytes: bytes) -> Report:
     except anthropic.BadRequestError as exc:
         log.warning("Report extraction rejected: %s", exc.message)
         raise ReportError("We couldn't read that PDF. Try a different file.") from exc
+    log_usage("extract", settings.answer_model, getattr(response, "usage", None))
     if response.stop_reason == "refusal":
         raise ReportError("We couldn't read that report. Try a different file.")
     if response.stop_reason == "max_tokens":

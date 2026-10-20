@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from .config import settings
 from .llm import get_client
 from .region import get_region
+from .usage import log_usage
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ async def classify(user_messages: list[str]) -> Verdict:
     try:
         response = await get_client().messages.parse(
             model=settings.safety_model,
-            max_tokens=2048,
+            max_tokens=1024,
             system=CLASSIFIER_SYSTEM,
             output_config={"effort": "low"},
             messages=[{"role": "user", "content": transcript.strip()}],
@@ -141,6 +142,7 @@ async def classify(user_messages: list[str]) -> Verdict:
     except anthropic.APIError:
         log.exception("Safety classifier call failed")
         return Verdict.UNAVAILABLE
+    log_usage("safety", settings.safety_model, getattr(response, "usage", None))
     if response.stop_reason == "refusal":
         log.warning("Safety classifier declined the request")
         return Verdict.UNAVAILABLE

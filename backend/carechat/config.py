@@ -25,7 +25,12 @@ class Settings:
     max_upload_bytes: int = field(default_factory=lambda: int(os.getenv("CARECHAT_MAX_UPLOAD_MB", "10")) * 1024 * 1024)
     # Extracted reports are deleted automatically after this many hours.
     report_retention_hours: float = field(default_factory=lambda: float(os.getenv("CARECHAT_REPORT_RETENTION_HOURS", "24")))
-    max_history_messages: int = 20
+    # Token budget controls.
+    max_history_messages: int = 12  # last 6 exchanges
+    max_assistant_chars_in_history: int = 2000  # long past answers are trimmed when resent
+    max_sources: int = 3
+    answer_max_tokens: int = 3000
+    extract_max_tokens: int = 8000
     max_message_chars: int = 4000
     allowed_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(

@@ -94,8 +94,10 @@ def test_report_upload_then_chat_includes_report(api, fake_client):
     assert "Test Patient" not in sent and "Patient: [REDACTED]" in sent
 
     api.post("/api/chat", json={"messages": [{"role": "user", "content": "Explain my results"}], "report_id": report_id})
-    prompt = fake_client.calls[-1][1]["messages"][-1]["content"]
-    assert "HbA1c | 6.1 | % | 4.0-5.6 | high" in prompt
+    system = fake_client.calls[-1][1]["system"]
+    # The report rides in a cached system block, not in every question.
+    assert "HbA1c | 6.1 | % | 4.0-5.6 | high" in system[1]["text"]
+    assert system[1]["cache_control"] == {"type": "ephemeral"}
 
     assert api.delete(f"/api/reports/{report_id}").json() == {"deleted": True}
     r = api.post("/api/chat", json={"messages": [{"role": "user", "content": "x"}], "report_id": report_id})
