@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -73,13 +74,24 @@ def test_rejects_conversation_ending_with_assistant(api):
     assert r.status_code == 422
 
 
+def sample_pdf() -> bytes:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "samples"))
+    from make_sample_report import build
+
+    return build()
+
+
 def test_report_upload_then_chat_includes_report(api, fake_client):
     fake_client.report = SAMPLE
-    r = api.post("/api/reports", files={"file": ("lab.pdf", b"%PDF-1.4 fake", "application/pdf")})
+    r = api.post("/api/reports", files={"file": ("lab.pdf", sample_pdf(), "application/pdf")})
     assert r.status_code == 200
     report_id = r.json()["report_id"]
-    sent_doc = fake_client.calls[-1][1]["messages"][0]["content"][0]
-    assert sent_doc["type"] == "document" and sent_doc["source"]["media_type"] == "application/pdf"
+    sent = fake_client.calls[-1][1]["messages"][0]["content"]
+    # Only redacted text is sent, never the PDF or the patient's name.
+    assert isinstance(sent, str) and "Hemoglobin A1c" in sent
+    assert "Test Patient" not in sent and "Patient: [REDACTED]" in sent
 
     api.post("/api/chat", json={"messages": [{"role": "user", "content": "Explain my results"}], "report_id": report_id})
     prompt = fake_client.calls[-1][1]["messages"][-1]["content"]
@@ -97,5 +109,37 @@ def test_upload_rejects_non_pdf(api):
 
 def test_upload_rejects_non_medical_document(api, fake_client):
     fake_client.report = Report(is_medical_report=False)
-    r = api.post("/api/reports", files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")})
+    r = api.post("/api/reports", files={"file": ("a.pdf", sample_pdf(), "application/pdf")})
     assert r.status_code == 422
+
+
+def test_upload_rejects_scanned_pdf_without_calling_claude(api, fake_client):
+    r = api.post("/api/reports", files={"file": ("scan.pdf", b"%PDF-1.4 no text layer", "application/pdf")})
+    assert r.status_code == 422 and "scan" in r.json()["detail"]
+    assert fake_client.calls == []
+
+
+def test_chat_strips_phone_numbers(api, fake_client):
+    api.post("/api/chat", json={"messages": [{"role": "user", "content": "call me on 98765 43210 about my A1C"}]})
+    for _, kwargs in fake_client.calls:
+        assert "98765" not in json.dumps(kwargs["messages"])
+
+
+def test_language_list_has_english_and_22_scheduled(api):
+    langs = api.get("/api/languages").json()
+    assert len(langs) == 23 and langs[0]["code"] == "en"
+
+
+def test_reply_language_is_sent_to_model(api, fake_client):
+    api.post("/api/chat", json={"messages": [{"role": "user", "content": "What is A1C?"}], "language": "ta"})
+    assert "<reply_language>Tamil</reply_language>" in fake_client.calls[-1][1]["messages"][-1]["content"]
+
+
+def test_unknown_language_rejected(api):
+    r = api.post("/api/chat", json={"messages": [{"role": "user", "content": "hi"}], "language": "xx"})
+    assert r.status_code == 422
+
+
+def test_safety_message_in_hindi(api):
+    ev = events(api.post("/api/chat", json={"messages": [{"role": "user", "content": "सीने में दर्द हो रहा है"}], "language": "hi"}))
+    assert ev[0]["verdict"] == "emergency" and "112" in ev[0]["message"] and "कृपया" in ev[0]["message"]

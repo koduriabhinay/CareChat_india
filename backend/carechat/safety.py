@@ -41,6 +41,12 @@ FIXED_MESSAGES = {
     Verdict.UNAVAILABLE: REGION.unavailable_message,
 }
 
+
+def fixed_message(verdict: Verdict, language: str | None = None) -> str:
+    """The fixed message in the user's language when a reviewed translation exists, else English."""
+    emergency, self_harm, unavailable = REGION.messages(language)
+    return {Verdict.EMERGENCY: emergency, Verdict.SELF_HARM: self_harm, Verdict.UNAVAILABLE: unavailable}[verdict]
+
 _SELF_HARM_PATTERNS = [
     r"\bsuicid",
     r"\bkill(ing)? myself\b",
@@ -48,6 +54,10 @@ _SELF_HARM_PATTERNS = [
     r"\bwant to die\b",
     r"\bhurt(ing)? myself\b",
     r"\bself[- ]harm",
+    r"\baatm?hatya",
+    r"\bjeene ka (mann|man) nahi",
+    r"आत्महत्या",
+    r"जीने का मन नहीं",
     r"\bno reason to live\b",
 ]
 
@@ -70,6 +80,12 @@ _EMERGENCY_PATTERNS = [
     r"\banaphyla",
     r"\bthroat (is )?(closing|swelling)\b",
     r"\bworst headache\b",
+    r"\b(seene|chhati|chhaati) (mein|me) (bahut )?dard\b",
+    r"\bsaans (nahi|nahin|lene mein)",
+    r"\bbehosh\b",
+    r"(सीने|छाती) में (बहुत )?दर्द",
+    r"सांस (नहीं|लेने में)",
+    r"बेहोश",
 ]
 
 _SELF_HARM_RE = re.compile("|".join(_SELF_HARM_PATTERNS), re.IGNORECASE)

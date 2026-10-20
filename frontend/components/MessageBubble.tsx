@@ -16,7 +16,7 @@ export default function MessageBubble({ message }: { message: UiMessage }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-teal-700 px-4 py-2 text-white">
+        <div dir="auto" className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-teal-700 px-4 py-2 text-white">
           {message.content}
         </div>
       </div>
@@ -30,7 +30,7 @@ export default function MessageBubble({ message }: { message: UiMessage }) {
         <p className="font-semibold text-red-800 dark:text-red-300">
           {message.alert === "self_harm" ? "You're not alone" : "This may be an emergency"}
         </p>
-        <p className="mt-1 text-red-900 dark:text-red-200">{message.content}</p>
+        <p dir="auto" className="mt-1 text-red-900 dark:text-red-200">{message.content}</p>
         <a
           href={`tel:${number}`}
           className="mt-3 inline-block rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800"
@@ -52,7 +52,7 @@ export default function MessageBubble({ message }: { message: UiMessage }) {
   return (
     <div className="max-w-[90%] rounded-2xl rounded-bl-sm bg-white px-4 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
       {message.content ? (
-        <div className="prose-chat">
+        <div dir="auto" className="prose-chat">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
         </div>
       ) : (

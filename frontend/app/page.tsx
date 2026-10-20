@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import MessageBubble, { type UiMessage } from "@/components/MessageBubble";
 import ReportPanel from "@/components/ReportPanel";
-import { getHealth, streamChat, type Report } from "@/lib/api";
+import { getHealth, getLanguages, streamChat, type Language, type Report } from "@/lib/api";
 
 const SUGGESTIONS_NO_REPORT = [
   "What does an HbA1c test measure?",
@@ -28,13 +28,33 @@ export default function Home() {
   const [disclaimer, setDisclaimer] = useState(
     "For education only, not medical advice. CareChat can't diagnose or treat. In an emergency, call 112.",
   );
+  const [languages, setLanguages] = useState<Language[]>([{ code: "en", name: "English" }]);
+  const [language, setLanguage] = useState("en");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getHealth()
       .then((h) => setDisclaimer(h.disclaimer))
       .catch(() => {});
+    getLanguages()
+      .then(setLanguages)
+      .catch(() => {});
+    try {
+      const saved = localStorage.getItem("carechat-language");
+      if (saved) setLanguage(saved);
+    } catch {
+      /* storage unavailable */
+    }
   }, []);
+
+  function chooseLanguage(code: string) {
+    setLanguage(code);
+    try {
+      localStorage.setItem("carechat-language", code);
+    } catch {
+      /* storage unavailable */
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,7 +77,7 @@ export default function Home() {
     setInput("");
     setBusy(true);
     try {
-      await streamChat(history, reportId, (event) => {
+      await streamChat(history, reportId, language, (event) => {
         switch (event.type) {
           case "safety":
             patch(reply.id, (m) => ({
@@ -103,7 +123,23 @@ export default function Home() {
   return (
     <div className="mx-auto flex h-dvh max-w-3xl flex-col px-4">
       <header className="pt-5 pb-3">
-        <h1 className="text-xl font-semibold text-teal-800 dark:text-teal-400">CareChat</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-teal-800 dark:text-teal-400">CareChat</h1>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            Answer in
+            <select
+              value={language}
+              onChange={(e) => chooseLanguage(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            >
+              {languages.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <p className="mt-1 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-400">
           {disclaimer}
         </p>
@@ -163,7 +199,8 @@ export default function Home() {
           }}
           rows={1}
           maxLength={4000}
-          placeholder={report ? "Ask about your report…" : "Ask a health question…"}
+          dir="auto"
+          placeholder={report ? "Ask about your report, in any language…" : "Ask a health question, in any language…"}
           className="flex-1 resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-teal-600 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
         />
         <button

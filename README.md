@@ -14,6 +14,11 @@ and complete the compliance steps below first.
 - **Screens every message first.** A keyword check plus a Claude Haiku classifier catch emergency
   and self-harm messages, including Hindi and Hinglish. Those get a fixed, human-written message
   (call 112, or Tele-MANAS on 14416) and never reach the answer model. If the screen can't run, CareChat refuses to answer (fails closed).
+- **Speaks Indian languages.** Users pick English or any of India's 22 scheduled languages and
+  answers come in that language. Fixed safety messages exist in English and draft Hindi only.
+- **Protects identity.** Names, IDs, phone numbers, Aadhaar and ABHA numbers are stripped from
+  reports before Claude sees them; scanned PDFs are rejected for now. Stored results auto-delete
+  after 24 hours.
 - **Stays in scope.** No diagnosis, no medicine or dose advice, no off-topic help.
 
 ## How it fits together
