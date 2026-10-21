@@ -1,111 +1,90 @@
-"""CareChat API server."""
+"""CareChat API server.
+
+Runs locally with uvicorn, and on Zoho Catalyst AppSail (see catalyst/README).
+"""
 
 from __future__ import annotations
 
-import json
-import logging
-from collections.abc import AsyncIterator
 import asyncio
+import logging
+import os
 from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timezone
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 
-from . import chat, reports
+from . import api
 from .config import settings
 from .knowledge import KnowledgeBase
-from .languages import LANGUAGES
-from .safety import REGION
-from .store import ReportStore
+from .metrics import metrics
+from .repo import Repo
+from .scheduled import run_hourly
+from .store import build_store
 
 logging.basicConfig(level=logging.INFO)
-
-DISCLAIMER = REGION.disclaimer
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.kb = KnowledgeBase(settings.db_path)
-    app.state.reports = ReportStore(settings.db_path, settings.report_retention_hours)
+    repo = Repo(build_store(settings))
+    app.state.repo = repo
+    app.state.kb = KnowledgeBase(settings.knowledge_path)
+    try:
+        month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
+        metrics.load_month(repo.metrics_since(month_start))
+    except Exception:  # the app still starts if saved metrics can't be read
+        log.exception("Could not load this month's usage")
 
-    async def purge_loop() -> None:
-        # Expired reports are already unreadable; this also removes them from disk.
-        while True:
-            await asyncio.sleep(600)
-            app.state.reports.purge_expired()
+    task = None
+    if settings.run_inprocess_jobs:
+        async def hourly_loop() -> None:
+            # Backup for the Catalyst cron; the reminder guard stops double emails.
+            while True:
+                await asyncio.sleep(3600)
+                await run_hourly(repo)
 
-    task = asyncio.create_task(purge_loop())
+        task = asyncio.create_task(hourly_loop())
     yield
-    task.cancel()
-    with suppress(asyncio.CancelledError):
-        await task
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+    with suppress(Exception):
+        snap = metrics.roll()
+        if snap:
+            repo.save_metrics(snap)
 
 
 app = FastAPI(title="CareChat API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.allowed_origins),
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
-@app.get("/api/health")
-async def health(request: Request) -> dict:
-    return {
-        "status": "ok",
-        "knowledge_passages": request.app.state.kb.count(),
-        "disclaimer": DISCLAIMER,
-        "region": REGION.code,
-        "emergency_number": REGION.emergency_number,
-        "crisis_number": REGION.crisis_number,
-    }
+@app.middleware("http")
+async def catalyst_headers(request: Request, call_next):
+    if settings.store_backend == "catalyst":
+        from .catalyst_store import remember_request_headers
+
+        remember_request_headers(request.headers)
+    return await call_next(request)
 
 
-@app.get("/api/languages")
-async def languages() -> list[dict]:
-    return [{"code": code, "name": name} for code, name in LANGUAGES.items()]
+app.include_router(api.router)
 
 
-@app.post("/api/reports")
-async def upload_report(request: Request, file: UploadFile = File(...)) -> dict:
-    data = await file.read(settings.max_upload_bytes + 1)
-    try:
-        report = await reports.extract_report(data)
-    except reports.ReportError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    report_id = request.app.state.reports.save(report)
-    return {"report_id": report_id, "report": report.model_dump(), "disclaimer": DISCLAIMER}
+def run() -> None:
+    """Entry point for AppSail: it passes the port in X_ZOHO_CATALYST_LISTEN_PORT."""
+    import uvicorn
+
+    port = int(os.getenv("X_ZOHO_CATALYST_LISTEN_PORT") or os.getenv("PORT") or 8000)
+    uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True)
 
 
-@app.delete("/api/reports/{report_id}")
-async def delete_report(request: Request, report_id: str) -> dict:
-    if not request.app.state.reports.delete(report_id):
-        raise HTTPException(status_code=404, detail="Report not found.")
-    return {"deleted": True}
-
-
-def _sse(event: dict) -> str:
-    return f"data: {json.dumps(event)}\n\n"
-
-
-@app.post("/api/chat")
-async def chat_endpoint(request: Request, body: chat.ChatRequest) -> StreamingResponse:
-    problem = chat.validate_request(body)
-    if problem:
-        raise HTTPException(status_code=422, detail=problem)
-    report = None
-    if body.report_id:
-        report = request.app.state.reports.get(body.report_id)
-        if report is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Report not found. Reports are deleted after 24 hours, so please upload it again.",
-            )
-
-    async def events() -> AsyncIterator[str]:
-        async for event in chat.answer(body, report, request.app.state.kb):
-            yield _sse(event)
-
-    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+if __name__ == "__main__":
+    run()

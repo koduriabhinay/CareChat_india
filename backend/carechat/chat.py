@@ -14,7 +14,6 @@ from .knowledge import KnowledgeBase, Passage
 from .llm import FALLBACK_BETA, get_client
 from .prompts import ANSWER_SYSTEM
 from .redact import redact_identifiers
-from .reports import Report
 from .languages import LANGUAGES, language_name
 from .safety import REGION, Verdict, fixed_message, screen
 from .usage import log_usage
@@ -36,25 +35,27 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1)
     report_id: str | None = None
+    profile_id: str | None = None
     # Code from languages.LANGUAGES, e.g. "ta". None means reply in the user's language.
     language: str | None = None
 
 
-def format_report(report: Report) -> str:
+def format_report(data: dict[str, Any]) -> str:
+    """A stored report as compact text for the prompt. Status was computed in code from the report's own ranges."""
     lines = []
-    if report.report_type:
-        lines.append(f"Report type: {report.report_type}")
-    if report.report_date:
-        lines.append(f"Date: {report.report_date}")
-    if report.results:
-        lines.append("Results (test | value | unit | reference range | flag on report):")
-        for r in report.results:
-            lines.append(
-                f"- {r.test_name} | {r.value} | {r.unit or '-'} | {r.reference_range or '-'} | {r.flag}"
-            )
-    if report.other_findings:
+    if data.get("report_type"):
+        lines.append(f"Report type: {data['report_type']}")
+    if data.get("report_date"):
+        lines.append(f"Date: {data['report_date']}")
+    rows = data.get("rows") or []
+    if rows:
+        lines.append("Results (test | value | unit | reference range | status):")
+        for r in rows:
+            status = "range not given on report" if r["status"] == "no_range" else r["status"]
+            lines.append(f"- {r['test_name']} | {r['value']} | {r.get('unit') or '-'} | {r.get('reference_range') or '-'} | {status}")
+    if data.get("other_findings"):
         lines.append("Other text from the report:")
-        lines.extend(f"- {f}" for f in report.other_findings)
+        lines.extend(f"- {f}" for f in data["other_findings"])
     return "\n".join(lines)
 
 
@@ -78,21 +79,20 @@ def _history_text(m: ChatMessage) -> str:
     return m.content
 
 
-def build_system(report: Report | None) -> list[dict[str, Any]]:
-    """Fixed instructions, then the report, each cached.
+def build_system(report_text: str | None, person: str | None = None) -> list[dict[str, Any]]:
+    """Fixed instructions, then the person's details and report, each cached.
 
     The report sits in the system prompt rather than in each question so it is
     sent once per conversation and read from cache on every follow-up.
     """
     blocks: list[dict[str, Any]] = [{"type": "text", "text": ANSWER_SYSTEM, "cache_control": CACHE}]
-    if report is not None:
-        blocks.append(
-            {
-                "type": "text",
-                "text": f"The user's uploaded report (identifiers removed):\n<report>\n{format_report(report)}\n</report>",
-                "cache_control": CACHE,
-            }
-        )
+    context = []
+    if person:
+        context.append(f"About the person (from their optional health form):\n<person>\n{person}\n</person>")
+    if report_text:
+        context.append(f"The user's uploaded report (identifiers removed):\n<report>\n{report_text}\n</report>")
+    if context:
+        blocks.append({"type": "text", "text": "\n\n".join(context), "cache_control": CACHE})
     return blocks
 
 
@@ -130,13 +130,14 @@ def validate_request(request: ChatRequest) -> str | None:
 
 
 async def answer(
-    request: ChatRequest, report: Report | None, kb: KnowledgeBase
+    request: ChatRequest, report_text: str | None, kb: KnowledgeBase, person: str | None = None
 ) -> AsyncIterator[dict[str, Any]]:
-    """Yield events: safety, sources, text deltas, then done."""
+    """Yield events: safety, sources, text deltas, then done (which carries the full answer)."""
     # Strip phone numbers, emails and ID numbers before anything is sent to Claude.
     request = ChatRequest(
         messages=[ChatMessage(role=m.role, content=redact_identifiers(m.content)) for m in request.messages],
         report_id=request.report_id,
+        profile_id=request.profile_id,
         language=request.language,
     )
     user_texts = [m.content for m in request.messages if m.role == "user"]
@@ -144,7 +145,7 @@ async def answer(
     if verdict is not Verdict.OK:
         call = REGION.crisis_number if verdict is Verdict.SELF_HARM else REGION.emergency_number
         yield {"type": "safety", "verdict": verdict.value, "message": fixed_message(verdict, request.language), "call": call}
-        yield {"type": "done"}
+        yield {"type": "done", "answer": None, "safety": verdict.value}
         return
 
     passages = kb.search(user_texts[-1], k=settings.max_sources)
@@ -156,28 +157,34 @@ async def answer(
     kwargs: dict[str, Any] = {}
     if settings.use_fallbacks:
         kwargs = {"betas": [FALLBACK_BETA], "fallbacks": "default"}
+    pieces: list[str] = []
     try:
         async with get_client().beta.messages.stream(
             model=settings.answer_model,
             max_tokens=settings.answer_max_tokens,
-            system=build_system(report),
+            system=build_system(report_text, person),
             output_config={"effort": "low"},
             messages=build_messages(request, passages),
             **kwargs,
         ) as stream:
             async for text in stream.text_stream:
+                pieces.append(text)
                 yield {"type": "text", "text": text}
             final = await stream.get_final_message()
         log_usage("answer", settings.answer_model, getattr(final, "usage", None))
     except anthropic.APIError:
         log.exception("Answer model call failed")
         yield {"type": "error", "message": ERROR_MESSAGE}
-        yield {"type": "done"}
+        yield {"type": "done", "answer": None, "error": True}
         return
 
+    full = "".join(pieces)
     if final.stop_reason == "refusal":
         # Discard any partial text the client has shown and replace it.
+        full = REFUSAL_MESSAGE
         yield {"type": "replace", "text": REFUSAL_MESSAGE}
     elif final.stop_reason == "max_tokens":
-        yield {"type": "text", "text": "\n\n(Answer cut short. Ask me to continue.)"}
-    yield {"type": "done"}
+        note = "\n\n(Answer cut short. Ask me to continue.)"
+        full += note
+        yield {"type": "text", "text": note}
+    yield {"type": "done", "answer": full}

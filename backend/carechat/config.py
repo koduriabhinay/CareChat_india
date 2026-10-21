@@ -11,32 +11,90 @@ def _bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _list(name: str, default: str = "") -> tuple[str, ...]:
+    return tuple(v.strip().lower() for v in os.getenv(name, default).split(",") if v.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
-    # Model that writes answers and reads uploaded reports.
+    # --- Claude ---
+    # Model that writes answers and summaries and reads uploaded reports.
     answer_model: str = field(default_factory=lambda: os.getenv("CARECHAT_ANSWER_MODEL", "claude-sonnet-5-5"))
     # Fast model that checks every message for emergency signs.
     safety_model: str = field(default_factory=lambda: os.getenv("CARECHAT_SAFETY_MODEL", "claude-haiku-5-5"))
-    # Server-side refusal fallbacks (Claude API only; turn off on Bedrock/Vertex).
+    # Server-side refusal fallbacks (Claude API only).
     use_fallbacks: bool = field(default_factory=lambda: _bool("CARECHAT_USE_FALLBACKS", True))
+    # Claude stops being called once estimated spend this month passes this (USD). 0 = no cap.
+    monthly_budget_usd: float = field(default_factory=lambda: float(os.getenv("CARECHAT_MONTHLY_BUDGET_USD", "25")))
+
+    # --- Region and languages ---
     # Launch region: sets emergency numbers and messages. "IN" (India) or "US".
     region_code: str = field(default_factory=lambda: os.getenv("CARECHAT_REGION", "IN"))
+
+    # --- Storage ---
+    # "sqlite" for local development and tests, "catalyst" for Zoho Catalyst Data Store.
+    store_backend: str = field(default_factory=lambda: os.getenv("CARECHAT_STORE", "sqlite"))
     db_path: str = field(default_factory=lambda: os.getenv("CARECHAT_DB_PATH", "carechat.db"))
+    # Read-only knowledge base file (MedlinePlus and Indian public pages), shipped with the app.
+    knowledge_path: str = field(default_factory=lambda: os.getenv("CARECHAT_KNOWLEDGE_PATH", "knowledge.db"))
+    # Catalyst Data Store table that holds every record (see README).
+    catalyst_table: str = field(default_factory=lambda: os.getenv("CARECHAT_CATALYST_TABLE", "records"))
+    # Key for encrypting health data before it is saved (Fernet key, see README).
+    encryption_key: str = field(default_factory=lambda: os.getenv("CARECHAT_ENCRYPTION_KEY", ""))
+
+    # --- Sign-in ---
+    # "dev" shows a no-password sign-in for local testing. Never use it in production.
+    auth_mode: str = field(default_factory=lambda: os.getenv("CARECHAT_AUTH_MODE", "prod"))
+    # Signs session tokens. Must be a long random string in production.
+    secret_key: str = field(default_factory=lambda: os.getenv("CARECHAT_SECRET_KEY", ""))
+    session_days: int = field(default_factory=lambda: int(os.getenv("CARECHAT_SESSION_DAYS", "30")))
+    # Google sign-in OAuth client id (from Google Cloud console). Empty hides the Google button.
+    google_client_id: str = field(default_factory=lambda: os.getenv("CARECHAT_GOOGLE_CLIENT_ID", ""))
+    # Emails that get the Admin level when they sign in.
+    admin_emails: tuple[str, ...] = field(default_factory=lambda: _list("CARECHAT_ADMIN_EMAILS"))
+
+    # --- Email (sign-in codes and reminders) ---
+    # "console" logs emails (development), "smtp" sends through an SMTP server.
+    mail_backend: str = field(default_factory=lambda: os.getenv("CARECHAT_MAIL", "console"))
+    smtp_host: str = field(default_factory=lambda: os.getenv("CARECHAT_SMTP_HOST", ""))
+    smtp_port: int = field(default_factory=lambda: int(os.getenv("CARECHAT_SMTP_PORT", "587")))
+    smtp_user: str = field(default_factory=lambda: os.getenv("CARECHAT_SMTP_USER", ""))
+    smtp_password: str = field(default_factory=lambda: os.getenv("CARECHAT_SMTP_PASSWORD", ""))
+    mail_from: str = field(default_factory=lambda: os.getenv("CARECHAT_MAIL_FROM", "CareChat <no-reply@example.com>"))
+    app_url: str = field(default_factory=lambda: os.getenv("CARECHAT_APP_URL", "http://localhost:3000"))
+
+    # --- Scheduled jobs ---
+    # Shared secret the Catalyst cron sends in the X-Cron-Token header.
+    cron_token: str = field(default_factory=lambda: os.getenv("CARECHAT_CRON_TOKEN", ""))
+    # Also run the hourly jobs inside the server (handy locally; Catalyst cron is the main trigger).
+    run_inprocess_jobs: bool = field(default_factory=lambda: _bool("CARECHAT_INPROCESS_JOBS", True))
+
+    # --- Limits ---
     max_upload_bytes: int = field(default_factory=lambda: int(os.getenv("CARECHAT_MAX_UPLOAD_MB", "10")) * 1024 * 1024)
-    # Extracted reports are deleted automatically after this many hours.
+    # Records without saved history are deleted after this many hours.
     report_retention_hours: float = field(default_factory=lambda: float(os.getenv("CARECHAT_REPORT_RETENTION_HOURS", "24")))
-    # Token budget controls.
+    daily_reports_per_user: int = field(default_factory=lambda: int(os.getenv("CARECHAT_DAILY_REPORTS", "10")))
+    daily_questions_per_user: int = field(default_factory=lambda: int(os.getenv("CARECHAT_DAILY_QUESTIONS", "60")))
+
+    # --- Token budget controls ---
     max_history_messages: int = 12  # last 6 exchanges
     max_assistant_chars_in_history: int = 2000  # long past answers are trimmed when resent
     max_sources: int = 3
-    answer_max_tokens: int = 3000
+    # Kept low so a streamed answer finishes well inside AppSail's 30-second request limit.
+    answer_max_tokens: int = field(default_factory=lambda: int(os.getenv("CARECHAT_ANSWER_MAX_TOKENS", "1200")))
+    summary_max_tokens: int = 2500
     extract_max_tokens: int = 8000
     max_message_chars: int = 4000
+
     allowed_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(
             o.strip() for o in os.getenv("CARECHAT_ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()
         )
     )
+
+    @property
+    def dev_auth(self) -> bool:
+        return self.auth_mode == "dev"
 
 
 settings = Settings()

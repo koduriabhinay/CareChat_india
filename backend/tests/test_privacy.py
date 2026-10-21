@@ -4,8 +4,7 @@ import pytest
 
 from carechat import store as store_module
 from carechat.redact import REDACTED, redact, redact_identifiers
-from carechat.reports import Report
-from carechat.store import ReportStore
+from carechat.store import Cipher, Record, SQLiteStore, expiry
 
 
 @pytest.mark.parametrize(
@@ -46,12 +45,35 @@ def test_chat_redaction_keeps_ordinary_text():
     assert "98765" not in redact_identifiers("my number is 9876543210")
 
 
-def test_reports_expire(tmp_path, monkeypatch):
-    s = ReportStore(str(tmp_path / "r.db"), retention_hours=24)
-    report_id = s.save(Report(is_medical_report=True))
-    assert s.get(report_id) is not None
+def test_records_expire(tmp_path, monkeypatch):
+    s = SQLiteStore(str(tmp_path / "r.db"), Cipher(""))
+    rec = s.insert(Record(collection="report", account_id="a", data={"x": 1}, expires_at=expiry(24)))
+    assert s.get("report", rec.id) is not None
 
-    real_now = store_module._now
-    monkeypatch.setattr(store_module, "_now", lambda: real_now() + timedelta(hours=25))
-    assert s.get(report_id) is None
+    real_now = store_module.now
+    monkeypatch.setattr(store_module, "now", lambda: real_now() + timedelta(hours=25))
+    assert s.get("report", rec.id) is None
     assert s.purge_expired() == 1
+
+
+def test_health_data_is_encrypted_at_rest(tmp_path):
+    import sqlite3
+
+    path = str(tmp_path / "r.db")
+    s = SQLiteStore(path, Cipher(""))
+    s.insert(Record(collection="report", account_id="a", data={"rows": [{"test_name": "HbA1c", "value": "6.1"}]}))
+    raw = sqlite3.connect(path).execute("SELECT data FROM records").fetchone()[0]
+    assert "HbA1c" not in raw and "6.1" not in raw
+
+
+def test_delete_where_refuses_empty_filter(tmp_path):
+    s = SQLiteStore(str(tmp_path / "r.db"), Cipher(""))
+    with pytest.raises(ValueError):
+        s.delete_where()
+
+
+def test_printed_name_and_known_names_are_redacted():
+    from carechat.redact import printed_name, redact_names
+
+    assert printed_name("Patient Name : Sunita Devi\nAge: 54") == "Sunita Devi"
+    assert "Sunita" not in redact_names("Report for Sunita, Hb 12", ["Sunita Devi"])

@@ -1,8 +1,7 @@
-"""Languages a user can choose for answers: English plus India's 22 scheduled languages.
+"""Languages CareChat speaks at launch: English plus India's ten most spoken languages.
 
-Ordered roughly by number of speakers so the most used appear first.
-Answer quality is lower in some less-resourced languages (for example
-Bodo, Santali, Dogri, Manipuri); evaluate each before promising it.
+Each one needs a native-speaker review of the screen text and the fixed
+safety messages before it goes live (see the testing plan).
 """
 
 LANGUAGES: dict[str, str] = {
@@ -17,18 +16,6 @@ LANGUAGES: dict[str, str] = {
     "kn": "Kannada (ಕನ್ನಡ)",
     "or": "Odia (ଓଡ଼ିଆ)",
     "ml": "Malayalam (മലയാളം)",
-    "pa": "Punjabi (ਪੰਜਾਬੀ)",
-    "as": "Assamese (অসমীয়া)",
-    "mai": "Maithili (मैथिली)",
-    "sat": "Santali (ᱥᱟᱱᱛᱟᱲᱤ)",
-    "ks": "Kashmiri (کٲشُر)",
-    "ne": "Nepali (नेपाली)",
-    "sd": "Sindhi (سنڌي)",
-    "kok": "Konkani (कोंकणी)",
-    "doi": "Dogri (डोगरी)",
-    "mni": "Manipuri (ꯃꯩꯇꯩꯂꯣꯟ)",
-    "brx": "Bodo (बड़ो)",
-    "sa": "Sanskrit (संस्कृतम्)",
 }
 
 
