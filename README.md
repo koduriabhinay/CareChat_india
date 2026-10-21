@@ -1,122 +1,200 @@
 # CareChat
 
-A chat assistant that helps patients understand their medical reports and get trustworthy health
-information in plain language. It educates and never diagnoses.
+CareChat helps people in India understand their lab reports in plain language, in their own
+language. It explains and teaches. It never diagnoses or prescribes.
 
-**Status:** MVP code. Not for real patients yet: run the safety evaluations, load reference content,
-and complete the compliance steps below first.
+**Status:** first version (launch scope). Not for real patients until the steps in
+[Before real patients use it](#before-real-patients-use-it) are done.
 
-## What it does
+## What's in this version
 
-- **Explains lab reports.** Upload a PDF; Claude reads it into a results table (test, value, unit,
-  range and flag exactly as printed), then explains it in chat.
-- **Answers health questions** from MedlinePlus content, citing sources like `[1]`.
-- **Screens every message first.** A keyword check plus a Claude Haiku classifier catch emergency
-  and self-harm messages, including Hindi and Hinglish. Those get a fixed, human-written message
-  (call 112, or Tele-MANAS on 14416) and never reach the answer model. If the screen can't run, CareChat refuses to answer (fails closed).
-- **Speaks Indian languages.** Users pick English or any of India's 22 scheduled languages and
-  answers come in that language. Fixed safety messages exist in English and draft Hindi only.
-- **Protects identity.** Names, IDs, phone numbers, Aadhaar and ABHA numbers are stripped from
-  reports before Claude sees them; scanned PDFs are rejected for now. Stored results auto-delete
-  after 24 hours.
-- **Stays in scope.** No diagnosis, no medicine or dose advice, no off-topic help.
+- **Report summary.** Take a photo or upload a PDF. Every value appears next to the range printed
+  on the report, marked low, normal or high ("range not given on report" when there is none). A
+  summary explains the overall picture and each flagged value, and suggests 2-3 questions for the
+  doctor. An urgent value shows a fixed emergency message first.
+- **Chat** about the report or general health, with sources, voice input and read-aloud (the
+  browser's own speech features), and thumbs up/down feedback.
+- **11 languages:** English, Hindi, Bengali, Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Odia
+  and Malayalam, for the app screens, the explanations and the safety messages.
+- **Family profiles.** Reports for each person, "whose report is this?" suggested from the printed
+  name, a warning when the age or sex on a report doesn't match, and a family view of anything
+  flagged.
+- **Health form** (all optional): age, sex, height, weight (BMI with the Indian cut-offs, weight
+  over time), conditions, medicines, pregnancy and diet (vegetarian, eggetarian, non-vegetarian,
+  vegan, Jain). Asked again every 3 months.
+- **History and trends** (opt-in): a timeline, a chart per test, changes worked out in code, a
+  "since the last report" view and "show this to your doctor soon" for big changes.
+- **Sign-in** with Google or an emailed code, or try without an account. Doctor-ready summary
+  (print or save as PDF), CSV download, reminders you set yourself (in the app and by email).
+- **Privacy:** consent screens with nothing pre-ticked (recorded with the notice version), adults
+  only, black-out tool for photos, names and ID numbers removed before Claude reads anything,
+  health data encrypted at rest, reports deleted after 24 hours unless history is on, one-tap
+  delete of everything.
+- **Admin dashboard:** active people by level and language, reports and chats per day, Claude
+  spend against the monthly limit, safety triggers, feedback, errors and response times. Counts
+  only, never names next to health values.
+- **Cost limits:** a monthly Claude budget (new work stops when it is reached) and daily limits per
+  person.
+
+Left for a later phase: the doctor case portal, learning tools (quizzes, guess-then-reveal) and the
+verification and case review queues.
 
 ## How it fits together
 
 ```
-Web app (Next.js) ──> API server (FastAPI) ──> Safety check (Claude Haiku)
-                              │                     │ red flag → fixed emergency message
-                              │                     ▼ safe
-                       Report store ──────────> Answer model (Claude Sonnet, streamed)
-                       (SQLite in dev)                ▲
-                                          Knowledge base (MedlinePlus, full-text search)
+Web app (Next.js, static files) ──> API (FastAPI on Zoho Catalyst AppSail) ──> Claude API
+                                          │                                     (Sonnet: reading,
+                                          ├─ Data Store (encrypted records)       summaries, answers;
+                                          ├─ Knowledge base (MedlinePlus, SQLite)  Haiku: safety screen)
+                                          └─ Email (Zoho Mail SMTP)
 ```
 
 | Folder | What's there |
 | --- | --- |
-| `backend/carechat/` | API server: `safety.py`, `reports.py`, `chat.py`, `knowledge.py`, `prompts.py` |
-| `backend/tests/` | Unit and API tests (offline, use a fake Claude client) |
+| `backend/carechat/` | API: `api.py` (routes), `reports.py`, `summary.py`, `results.py` (status, trends, BMI), `safety.py`, `chat.py`, `repo.py` (records and retention), `catalyst_store.py` |
+| `backend/tests/` | Offline tests with a fake Claude client |
 | `backend/evals/` | Safety evaluations that call the real API |
-| `backend/scripts/` | MedlinePlus loader |
-| `backend/samples/` | Synthetic lab report PDF generator |
-| `frontend/` | Next.js chat app |
+| `backend/scripts/` | MedlinePlus loader, offline demo server |
+| `frontend/` | Web app; `locales/` holds the screen text per language |
+| `deploy/` | Zoho Catalyst config and build script |
 
-## Run it locally
+## Try it on your computer (no API key needed)
 
-You need Python 3.11+, Node 20+, and an Anthropic API key.
+You need Python 3.11+ and Node 20+.
 
 ```bash
-# 1. API server
+# 1. API with a stand-in for Claude (canned answers, no cost)
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-export ANTHROPIC_API_KEY=sk-ant-...
-python -m scripts.ingest_medlineplus --urls scripts/lab_test_urls.txt   # load reference pages
-uvicorn carechat.main:app --reload --port 8000
+python -m scripts.offline_demo          # http://localhost:8000
 
 # 2. Web app (new terminal)
 cd frontend
 npm install
 cp .env.example .env.local
-npm run dev        # open http://localhost:3000
+npm run dev                             # open http://localhost:3000
 ```
 
-Make a test report with `python samples/make_sample_report.py samples/sample_lab_report.pdf`
-(all values are made up). For all MedlinePlus health topics, download the XML from
-https://medlineplus.gov/xml.html and run `python -m scripts.ingest_medlineplus --topics-xml <file>`.
-Check MedlinePlus's reuse terms first.
+Sign in with any email using "Test sign-in". To see the admin dashboard, start the API with
+`CARECHAT_ADMIN_EMAILS=you@example.com`.
+
+To use real Claude, copy `backend/.env.example` to `backend/.env`, fill it in, load the reference
+pages once, and run the real server:
+
+```bash
+cd backend
+set -a && source .env && set +a
+python -m scripts.ingest_medlineplus --urls scripts/lab_test_urls.txt
+uvicorn carechat.main:app --reload --port 8000
+```
+
+## Put it online on Zoho Catalyst (free student tier)
+
+The Claude API is the only paid service. Everything else runs on Catalyst's free tier in the India
+data centre.
+
+### What you need
+
+1. **Anthropic API key** from console.anthropic.com. Set a monthly spend limit there too
+   (Settings > Limits), as a second guard behind CareChat's own budget.
+2. **Zoho account** with Catalyst, created in the **India data centre** (catalyst.zoho.in).
+3. **Catalyst CLI:** `npm install -g zcatalyst-cli`, then `catalyst login`.
+4. **A GitHub repository** for this code (optional but recommended). A workflow in
+   `.github/workflows/ci.yml` runs the tests on every push.
+5. Optional: a **Google OAuth client id** (Google Cloud console > APIs & Services > Credentials >
+   OAuth client, type Web) for "Sign in with Google", and a **Zoho Mail** address with an app
+   password for sign-in codes and reminder emails.
+
+### Steps
+
+1. **Create the project.** In the Catalyst console, create a project (for example `carechat`). In
+   an empty folder run `catalyst init`, pick the project, and note the `.catalystrc` it creates.
+   Copy that `.catalystrc` into `deploy/catalyst/`.
+2. **Create the Data Store table.** Cloud Scale > Data Store > Create table `records` with these
+   columns:
+
+   | Column | Type |
+   | --- | --- |
+   | doc_id | Var Char (64), unique |
+   | collection | Var Char (32) |
+   | account_id | Var Char (64) |
+   | profile_id | Var Char (64) |
+   | ref_id | Var Char (64) |
+   | created_at | Var Char (32) |
+   | expires_at | Var Char (32) |
+   | data | Text |
+
+   Give the AppSail service read, write and delete permission on it (the table's Scopes and
+   Permissions page).
+3. **Load the knowledge base** on your computer (needs internet, no API key):
+   `cd backend && python -m scripts.ingest_medlineplus --urls scripts/lab_test_urls.txt`.
+   This makes `backend/knowledge.db`, which ships with the API.
+4. **First deploy of the API**, to get its address: run
+   `CARECHAT_API_URL=https://placeholder ./deploy/build_catalyst.sh`, then
+   `cd build/catalyst && catalyst deploy`. The CLI prints the AppSail URL (like
+   `https://carechatapi-6xxxxxxxx.development.catalystappsail.in`) and the web client URL (like
+   `https://carechat-6xxxxxxxx.development.catalystserverless.in/app/`).
+5. **Set the environment variables** on the AppSail service (console > AppSail > carechatapi >
+   Configuration). Use `backend/.env.example` as the list. At minimum:
+   - `ANTHROPIC_API_KEY`
+   - `CARECHAT_SECRET_KEY`, `CARECHAT_CRON_TOKEN`, `CARECHAT_ENCRYPTION_KEY` (the file shows how to
+     make each; keep a safe copy of the encryption key, because losing it makes saved data
+     unreadable)
+   - `CARECHAT_AUTH_MODE=prod`
+   - `CARECHAT_ADMIN_EMAILS` (your email)
+   - `CARECHAT_ALLOWED_ORIGINS` and `CARECHAT_APP_URL`: the web client URL without `/app/`, for
+     example `https://carechat-6xxxxxxxx.development.catalystserverless.in`
+   - `CARECHAT_MAIL=smtp` plus the SMTP settings, and `CARECHAT_GOOGLE_CLIENT_ID` if you use them
+   - `CARECHAT_MONTHLY_BUDGET_USD` (for example 10)
+6. **Rebuild with the real API address and deploy again:**
+   `CARECHAT_API_URL=https://carechatapi-6xxxxxxxx.development.catalystappsail.in ./deploy/build_catalyst.sh`
+   then `cd build/catalyst && catalyst deploy`.
+7. **Hourly job.** In the console, Job Scheduling (Cron) > create a cron that runs every hour and
+   calls a URL: `POST <AppSail URL>/api/internal/hourly` with header `X-Cron-Token: <your cron
+   token>`. It deletes expired data, saves usage numbers and sends reminder emails. (While the API
+   is awake it also does this itself, but AppSail sleeps when idle.)
+8. **Google sign-in (optional):** add the web client URL to the OAuth client's "Authorised
+   JavaScript origins".
+9. **Check it:** open the web client URL, sign in, accept, add yourself, upload
+   `backend/samples/sample_lab_report.pdf`.
+
+If Catalyst serves the web app at the root of a domain instead of `/app` (Slate or a custom
+domain), build with `CARECHAT_BASE_PATH=""`.
+
+### Free tier limits that matter
+
+- Data Store: 2 GB and limited reads and writes a month. CareChat caches reads in memory and saves
+  usage numbers once an hour to stay well inside them. Watch Usage in the console as people join.
+- AppSail: one request may take up to 30 seconds and the service sleeps after a few idle minutes,
+  so the first request after a pause is slow. Report reading runs in the background for this
+  reason.
+- The API keeps rate limits, sign-in codes and the read cache in memory, so run one instance.
 
 ## Tests and evaluations
 
 ```bash
 cd backend
-pytest                              # fast, offline
+pytest                              # offline: 113 tests
 python -m evals.run_evals safety    # real API: emergency and self-harm detection
-python -m evals.run_evals scope     # real API: declines diagnosis, dosing, off-topic (Opus judge)
+python -m evals.run_evals scope     # real API: declines diagnosis, dosing, off-topic
 ```
 
-The evaluation sets are a starter (46 safety cases including Hindi and Hinglish, 15 scope cases). The plan calls for 200
-red-flag messages and clinician-reviewed answer accuracy before any pilot.
+## Before real patients use it
 
-## Configuration
+These are engineering notes, not legal advice.
 
-See `backend/.env.example`. The launch region is India (`CARECHAT_REGION=IN`): emergency
-messages use 112 (108 for an ambulance) and Tele-MANAS (14416). `CARECHAT_REGION=US` switches to
-911 and 988. Re-check every number against official sources before launch. Other defaults: answers and report reading use `claude-sonnet-5-5` at effort
-`low` (fast chat), the safety screen uses `claude-haiku-5-5`, and server-side refusal fallbacks
-(`fallbacks: "default"`) are on. Fallbacks work on the Claude API only; set
-`CARECHAT_USE_FALLBACKS=false` on Bedrock or Vertex.
-
-## Token use
-
-- **Prompt caching:** the fixed instructions and the user's report sit in cached system blocks,
-  and the earlier conversation is cached up to the latest question. Follow-ups read them at
-  about a tenth of the normal input price.
-- **Smaller inputs:** last 12 messages only, past answers over 2,000 characters trimmed, top 3
-  sources, and report text with layout spacing squeezed out before extraction.
-- **Output caps:** 3,000 tokens per answer, 8,000 for report extraction, 1,024 for the safety check.
-- **Logging:** every Claude call logs `tokens call=... input=... cache_read=... cache_write=... output=...`
-  under the `carechat.tokens` logger, so cost and cache hit rate can be tracked.
-
-## Before real patients use it (India launch)
-
-These are engineering notes, not legal advice. Have a lawyer familiar with Indian health and data
-law review the launch.
-
-- **DPDP Act 2023 and DPDP Rules 2025.** CareChat is a data fiduciary. It needs a clear consent
-  notice in plain language (and in the user's language), a way to withdraw consent and delete data,
-  breach reporting to the Data Protection Board and affected users, and a named contact for
-  grievances. Users under 18 need verifiable parental consent, so either verify age or block minors.
-- **Hosting.** Use an India region such as AWS Mumbai (ap-south-1). The DPDP Act does not require
-  data to stay in India today, but check where Claude processes requests and record it in the
-  privacy notice. Sign Anthropic's data processing terms.
+- **Clinician review of the safety messages.** The emergency, self-harm, urgent-value and
+  disclaimer texts in all 10 Indian languages (`backend/carechat/fixed_messages.json`) are drafts.
+  A native-speaking clinician must check each one. Known doubts: "faint" and "confused" in the
+  urgent-value message, Telugu "can't", Odia loanwords, and how the Urdu numbers display.
+- **Screen translations** in `frontend/locales/` are drafts too; have native speakers check them.
+- **Urgent-value limits** in `backend/carechat/results.py` and the "big change" threshold (30%) are
+  starting values for a clinician to set.
+- **Privacy notice and terms** (in `frontend/locales/en.json`) need a lawyer's review, a named
+  grievance officer, and Anthropic's data processing terms signed. DPDP Act 2023 and Rules apply.
 - **Stay educational.** Software that diagnoses or recommends treatment can count as a medical
-  device under CDSCO rules, and only registered medical practitioners may give consultations under
-  the Telemedicine Practice Guidelines. CareChat must keep explaining, never diagnosing or
-  prescribing.
-- **Storage and login.** Move to an encrypted database and add login. The dev SQLite file is not
-  encrypted. Uploaded PDFs are never stored, only extracted results.
-- **Content.** MedlinePlus is US content; consider adding Indian public sources and checking that
-  advice fits Indian care settings. Test with real Indian lab report layouts.
-- **Evaluation.** Grow and pass the evaluation sets, with more Hindi and regional-language cases,
-  and have a clinician review answers.
+  device under CDSCO rules.
+- **Evaluation.** Grow the evaluation sets with more Indian-language cases and real Indian report
+  layouts, and have a clinician review a sample of answers (the admin page collects
+  thumbs-down answers for this).

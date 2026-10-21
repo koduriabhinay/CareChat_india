@@ -1,0 +1,6 @@
+{
+  "name": "carechat",
+  "version": "0.1.0",
+  "homepage": "index.html",
+  "login_redirect": "index.html"
+}
