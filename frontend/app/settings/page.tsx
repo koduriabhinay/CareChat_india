@@ -48,7 +48,7 @@ export default function Settings() {
       <div className="space-y-4">
         <section className={`${card} space-y-2`}>
           <h2 className="font-semibold">{t("account")}</h2>
-          <p className="text-sm">{me.guest ? t("guest_account") : t("signed_in_as", { email: me.email ?? "" })}</p>
+          <p className="text-sm">{me.guest ? t("guest_account") : t("signed_in_as", { email: me.email ?? me.phone ?? "" })}</p>
           <div className="flex flex-wrap gap-2">
             {me.guest && <Link href="/signin/" className={btnPrimary}>{t("sign_in_to_keep")}</Link>}
             <button className={btnSecondary} onClick={() => { signOut(); router.push("/"); }}>{t("sign_out")}</button>

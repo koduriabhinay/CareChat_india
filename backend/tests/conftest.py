@@ -99,6 +99,7 @@ def db_path(tmp_path):
         "store_backend": "sqlite",
         "auth_mode": "dev",
         "mail_backend": "console",
+        "sms_backend": "console",
         "run_inprocess_jobs": False,
         "cron_token": "cron-secret",
         "admin_emails": ("admin@example.com",),

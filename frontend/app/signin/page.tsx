@@ -32,6 +32,10 @@ export default function SignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gisLoaded, setGisLoaded] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [smsCode, setSmsCode] = useState("");
+  const [smsSent, setSmsSent] = useState(false);
+  const [smsDevCode, setSmsDevCode] = useState<string | null>(null);
   const googleRef = useRef<HTMLDivElement>(null);
 
   // A guest who signs in keeps what they added.
@@ -86,6 +90,55 @@ export default function SignIn() {
             <div ref={googleRef} />
           </div>
         )}
+        {health?.phone_sign_in && (
+          <form
+            className={`${card} space-y-3`}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!smsSent) {
+                run(async () => {
+                  const out = await api<{ sent: boolean; dev_code?: string }>("/api/auth/phone/start", "POST", { phone });
+                  setSmsSent(true);
+                  setSmsDevCode(out.dev_code ?? null);
+                });
+              } else {
+                run(async () => {
+                  const out = await api<{ token: string }>("/api/auth/phone/verify", "POST", {
+                    phone, code: smsCode, guest_token: guestToken, language: lang,
+                  });
+                  await finish(out.token);
+                });
+              }
+            }}
+          >
+            <label className="block text-sm font-medium" htmlFor="phone">{t("mobile_number")}</label>
+            <div className="flex items-center gap-2" dir="ltr">
+              <span className="rounded-lg border border-slate-300 px-3 py-2 text-base dark:border-slate-700">+91</span>
+              <input id="phone" type="tel" inputMode="numeric" autoComplete="tel-national" required maxLength={14}
+                     className={input} value={phone} onChange={(e) => setPhone(e.target.value)} disabled={smsSent}
+                     placeholder="98765 43210" />
+            </div>
+            {smsSent && (
+              <>
+                <label className="block text-sm font-medium" htmlFor="smscode">{t("enter_sms_code")}</label>
+                <input id="smscode" inputMode="numeric" autoComplete="one-time-code" required className={input} value={smsCode}
+                       onChange={(e) => setSmsCode(e.target.value.trim())} />
+                {smsDevCode && <p className="text-xs text-amber-700">{t("dev_code_note", { code: smsDevCode })}</p>}
+              </>
+            )}
+            <button className={`${btnPrimary} w-full`} disabled={busy}>
+              {smsSent ? t("sign_in") : t("send_sms_code")}
+            </button>
+            {smsSent ? (
+              <button type="button" className="text-sm underline" onClick={() => { setSmsSent(false); setSmsCode(""); }}>
+                {t("use_other_number")}
+              </button>
+            ) : (
+              <p className="text-xs text-slate-600 dark:text-slate-400">{t("sms_note")}</p>
+            )}
+          </form>
+        )}
+        <p className="text-center text-xs uppercase tracking-wide text-slate-500">{t("or_use_email")}</p>
         <form
           className={`${card} space-y-3`}
           onSubmit={(e) => {

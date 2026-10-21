@@ -15,6 +15,7 @@ export interface Health {
   crisis_number: string;
   crisis_line_name: string;
   google_client_id: string | null;
+  phone_sign_in: boolean;
   dev_auth: boolean;
   notice_version: string;
 }
@@ -24,6 +25,7 @@ export interface Me {
   role: Role;
   guest: boolean;
   email: string | null;
+  phone: string | null;
   ui_language: string;
   history_enabled: boolean;
   reminder_emails: boolean;

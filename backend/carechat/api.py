@@ -18,7 +18,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import AfterValidator, BaseModel, Field
 from typing import Annotated
 
-from . import auth, chat, mailer, reports
+from . import auth, chat, mailer, reports, sms
 from .auth import Principal, current_principal, require_admin, require_member
 from .config import settings
 from .jobs import person_text, run_in_background, read_report
@@ -84,6 +84,7 @@ async def health(request: Request, language: str | None = None) -> dict:
         "crisis_number": REGION.crisis_number,
         "crisis_line_name": REGION.crisis_line_name,
         "google_client_id": settings.google_client_id or None,
+        "phone_sign_in": sms.enabled(),
         "dev_auth": settings.dev_auth,
         "notice_version": NOTICE_VERSION,
     }
@@ -133,6 +134,11 @@ def _sign_in(request: Request, email: str, guest_token: str | None, language: st
     repo = repo_of(request)
     is_new = repo.account_by_email(email) is None
     account = repo.get_or_create_member(email, auth.role_for_email(email), language=_lang(language))
+    return _finish_sign_in(request, account, is_new, guest_token)
+
+
+def _finish_sign_in(request: Request, account: Record, is_new: bool, guest_token: str | None) -> dict:
+    repo = repo_of(request)
     if is_new:
         metrics.event("signups")
     if guest_token:
@@ -172,6 +178,58 @@ async def email_verify(request: Request, body: EmailVerifyIn) -> dict:
     return _sign_in(request, body.email, body.guest_token, body.language)
 
 
+class PhoneStartIn(BaseModel):
+    phone: str = Field(max_length=20)
+
+
+class PhoneVerifyIn(BaseModel):
+    phone: str = Field(max_length=20)
+    code: str = Field(min_length=4, max_length=10)
+    guest_token: str | None = None
+    language: str | None = None
+
+
+def _phone(raw: str) -> str:
+    phone = sms.normalize_phone(raw)
+    if not phone:
+        raise HTTPException(status_code=422, detail="Please enter a 10-digit Indian mobile number.")
+    return phone
+
+
+@router.post("/auth/phone/start")
+async def phone_start(request: Request, body: PhoneStartIn) -> dict:
+    if not sms.enabled():
+        raise HTTPException(status_code=404, detail="Mobile number sign-in isn't available. Please use email.")
+    phone = _phone(body.phone)
+    ip = request.client.host if request.client else "unknown"
+    # Each SMS costs money: limit per number, per network address, and in total each day.
+    if limits.used("all", "sms") >= settings.daily_sms_cap:
+        raise HTTPException(status_code=429, detail="Mobile sign-in is busy today. Please use email or Google instead.")
+    if not limits.take(phone, "sms", 3) or not limits.take(ip, "sms_ip", 10):
+        raise HTTPException(status_code=429, detail="Too many codes today. Please try again tomorrow or use email.")
+    try:
+        code = await sms.send_code(phone)
+    except sms.SmsError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    limits.take("all", "sms", settings.daily_sms_cap)
+    metrics.event("sms_sent")
+    out: dict[str, Any] = {"sent": True, "phone": phone}
+    if code and settings.dev_auth:
+        out["dev_code"] = code  # local testing only
+    return out
+
+
+@router.post("/auth/phone/verify")
+async def phone_verify(request: Request, body: PhoneVerifyIn) -> dict:
+    phone = _phone(body.phone)
+    if not await sms.check_code(phone, body.code):
+        raise HTTPException(status_code=400, detail="That code is wrong or has expired.")
+    repo = repo_of(request)
+    is_new = repo.account_by_phone(phone) is None
+    account = repo.get_or_create_phone_member(phone, _lang(body.language))
+    return _finish_sign_in(request, account, is_new, body.guest_token)
+
+
 @router.post("/auth/google")
 async def google(request: Request, body: GoogleIn) -> dict:
     email = await auth.verify_google_token(body.id_token)
@@ -197,6 +255,7 @@ def _me(request: Request, account: Record) -> dict:
         "role": account.data.get("role"),
         "guest": bool(account.data.get("guest")),
         "email": account.data.get("email"),
+        "phone": account.data.get("phone"),
         "ui_language": account.data.get("ui_language", "en"),
         "history_enabled": bool(account.data.get("history_enabled")),
         "reminder_emails": bool(account.data.get("reminder_emails", True)),
@@ -649,7 +708,8 @@ async def add_reminder(request: Request, body: ReminderIn, principal: Principal 
     if len(repo_of(request).reminders(account.id)) >= 30:
         raise HTTPException(status_code=400, detail="That's the most reminders one account can have.")
     rec = repo_of(request).create_reminder(account, body.profile_id, {
-        "title": body.title.strip(), "kind": body.kind, "schedule": body.schedule.model_dump(), "email": body.email,
+        "title": body.title.strip(), "kind": body.kind, "schedule": body.schedule.model_dump(),
+        "email": body.email and bool(account.data.get("email")),
         "active": True,
     })
     return {"id": rec.id, "profile_id": rec.profile_id, **rec.data}

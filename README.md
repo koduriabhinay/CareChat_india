@@ -24,7 +24,8 @@ language. It explains and teaches. It never diagnoses or prescribes.
   vegan, Jain). Asked again every 3 months.
 - **History and trends** (opt-in): a timeline, a chart per test, changes worked out in code, a
   "since the last report" view and "show this to your doctor soon" for big changes.
-- **Sign-in** with Google or an emailed code, or try without an account. Doctor-ready summary
+- **Sign-in** with an Indian mobile number (SMS code), Google or an emailed code, or try without
+  an account. Doctor-ready summary
   (print or save as PDF), CSV download, reminders you set yourself (in the app and by email).
 - **Privacy:** consent screens with nothing pre-ticked (recorded with the notice version), adults
   only, black-out tool for photos, names and ID numbers removed before Claude reads anything,
@@ -105,6 +106,10 @@ data centre.
 5. Optional: a **Google OAuth client id** (Google Cloud console > APIs & Services > Credentials >
    OAuth client, type Web) for "Sign in with Google", and a **Zoho Mail** address with an app
    password for sign-in codes and reminder emails.
+6. Optional: a **Message Central** account for mobile number sign-in
+   (https://console.messagecentral.com/signup, email and password, no card). It sends the SMS
+   codes on its own registered template, so you don't need TRAI DLT registration. Each code costs
+   about ₹0.20; new accounts get free test credits. Copy the **Customer ID** from its console.
 
 ### Steps
 
@@ -147,6 +152,9 @@ data centre.
      example `https://carechat-6xxxxxxxx.development.catalystserverless.in`
    - `CARECHAT_MAIL=smtp` plus the SMTP settings, and `CARECHAT_GOOGLE_CLIENT_ID` if you use them
    - `CARECHAT_MONTHLY_BUDGET_USD` (for example 10)
+   - For mobile sign-in: `CARECHAT_SMS=messagecentral`, `CARECHAT_MC_CUSTOMER_ID`,
+     `CARECHAT_MC_PASSWORD` and `CARECHAT_DAILY_SMS_CAP` (codes per day in total, for example 100,
+     which caps SMS spend at about ₹20 a day). Without them, mobile sign-in stays hidden.
 6. **Rebuild with the real API address and deploy again:**
    `CARECHAT_API_URL=https://carechatapi-6xxxxxxxx.development.catalystappsail.in ./deploy/build_catalyst.sh`
    then `cd build/catalyst && catalyst deploy`.
@@ -175,7 +183,7 @@ domain), build with `CARECHAT_BASE_PATH=""`.
 
 ```bash
 cd backend
-pytest                              # offline: 113 tests
+pytest                              # offline tests
 python -m evals.run_evals safety    # real API: emergency and self-harm detection
 python -m evals.run_evals scope     # real API: declines diagnosis, dosing, off-topic
 ```

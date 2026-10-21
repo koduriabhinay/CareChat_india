@@ -63,6 +63,14 @@ class Settings:
     mail_from: str = field(default_factory=lambda: os.getenv("CARECHAT_MAIL_FROM", "CareChat <no-reply@example.com>"))
     app_url: str = field(default_factory=lambda: os.getenv("CARECHAT_APP_URL", "http://localhost:3000"))
 
+    # --- SMS (mobile number sign-in) ---
+    # "console" logs codes (development), "messagecentral" sends real SMS, "off" hides mobile sign-in.
+    sms_backend: str = field(default_factory=lambda: os.getenv("CARECHAT_SMS", "console"))
+    mc_customer_id: str = field(default_factory=lambda: os.getenv("CARECHAT_MC_CUSTOMER_ID", ""))
+    mc_password: str = field(default_factory=lambda: os.getenv("CARECHAT_MC_PASSWORD", ""))
+    # Every SMS costs money: a ceiling on codes sent per day across everyone.
+    daily_sms_cap: int = field(default_factory=lambda: int(os.getenv("CARECHAT_DAILY_SMS_CAP", "100")))
+
     # --- Scheduled jobs ---
     # Shared secret the Catalyst cron sends in the X-Cron-Token header.
     cron_token: str = field(default_factory=lambda: os.getenv("CARECHAT_CRON_TOKEN", ""))

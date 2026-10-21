@@ -43,7 +43,7 @@
  "sign_in_or_create": "Sign in or create an account",
  "try_as_guest": "Try without an account",
  "guest_note": "Without an account, everything is deleted after 24 hours.",
- "signin_sub": "Use Google or get a code by email. No password needed.",
+ "signin_sub": "Use your mobile number, Google or email. No password needed.",
  "email": "Email address",
  "enter_code": "6-digit code from the email",
  "send_code": "Email me a code",
@@ -298,5 +298,12 @@
  "terms_s4_title": "Fair use",
  "terms_s4_body": "Each person can read a limited number of reports and ask a limited number of questions each day. Don't upload reports of people who haven't agreed.",
  "terms_s5_title": "Changes",
- "terms_s5_body": "We may update these terms. If we do, we will ask you to agree again."
+ "terms_s5_body": "We may update these terms. If we do, we will ask you to agree again.",
+ "mobile_number": "Mobile number",
+ "send_sms_code": "Send me a code by SMS",
+ "enter_sms_code": "6-digit code from the SMS",
+ "use_other_number": "Use a different number",
+ "sms_note": "Indian mobile numbers only. Standard SMS from CareChat, no charge to you.",
+ "or_use_email": "or use email",
+ "reminders_in_app_only": "You signed in with a mobile number, so reminders show in the app only."
 }

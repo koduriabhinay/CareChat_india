@@ -27,6 +27,10 @@ def email_key(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()
 
 
+def phone_key(phone: str) -> str:
+    return hashlib.sha256(f"phone:{phone}".encode()).hexdigest()
+
+
 class Repo:
     def __init__(self, store: CachedStore) -> None:
         self.store = store
@@ -56,6 +60,21 @@ class Repo:
         rec = Record(collection="account", ref_id=email_key(email), data={
             "guest": False, "role": role, "email": email.strip().lower(), "name": name or "",
             "ui_language": language or "en", "history_enabled": False, "reminder_emails": True,
+        })
+        rec.account_id = rec.id
+        return self.store.insert(rec)
+
+    def account_by_phone(self, phone: str) -> Record | None:
+        found = self.store.find("account", ref_id=phone_key(phone))
+        return found[0] if found else None
+
+    def get_or_create_phone_member(self, phone: str, language: str | None = None) -> Record:
+        rec = self.account_by_phone(phone)
+        if rec is not None:
+            return rec
+        rec = Record(collection="account", ref_id=phone_key(phone), data={
+            "guest": False, "role": "patient", "email": None, "phone": phone, "name": "",
+            "ui_language": language or "en", "history_enabled": False, "reminder_emails": False,
         })
         rec.account_id = rec.id
         return self.store.insert(rec)
