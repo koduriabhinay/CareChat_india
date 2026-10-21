@@ -69,7 +69,7 @@
  "report_still_reading": "ಒಂದು ರಿಪೋರ್ಟ್ ಇನ್ನೂ ಓದಲಾಗುತ್ತಿದೆ. ನೋಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
  "family_attention": "ಗಮನಿಸಬೇಕು",
  "has_urgent_value": "ಒಂದು ತುರ್ತು ಮೌಲ್ಯ ಇದೆ",
- "values_to_look_at": "ಗಮನಿಸಬೇಕಾದ ಮೌಲ್ಯಗಳು: {count}",
+ "values_to_look_at": "{count} ಮೌಲ್ಯಗಳನ್ನು ಗಮನಿಸಬೇಕು",
  "all_in_range": "ಎಲ್ಲಾ ಮೌಲ್ಯಗಳು ವ್ಯಾಪ್ತಿಯೊಳಗಿವೆ",
  "add_yourself_first": "ಮೊದಲು ನಿಮ್ಮ ಸ್ವಂತ ವಿವರಗಳನ್ನು ಸೇರಿಸಿ.",
  "add_my_details": "ನನ್ನ ವಿವರ ಸೇರಿಸಿ",
