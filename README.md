@@ -87,9 +87,11 @@ pages once, and run the real server. Run these inside the `.venv` you made above
 cd backend
 source .venv/bin/activate
 python -m scripts.ingest_medlineplus --urls scripts/lab_test_urls.txt
-set -a && source .env && set +a          # loads your API key and settings
 python -m uvicorn carechat.main:app --reload --port 8000
 ```
+
+CareChat reads `backend/.env` by itself when it starts, so there is no need to `source` it.
+Anything already set in your terminal takes priority over the file.
 
 Use `python -m uvicorn`, not plain `uvicorn`: with Conda (or another Python) active, plain
 `uvicorn` can start a different Python that doesn't have CareChat's packages, and fails with

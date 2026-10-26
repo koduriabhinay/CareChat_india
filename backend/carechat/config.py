@@ -1,7 +1,35 @@
 """Settings, read from environment variables."""
 
 import os
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
+
+
+def _load_dotenv(path: Path) -> None:
+    """Read KEY=value lines from backend/.env into the environment.
+
+    Values already set in the environment win. Quotes around a value are removed, and
+    values may hold spaces or <>, so "CareChat <no-reply@example.com>" works with or
+    without quotes. Skipped during tests so a local .env can't change them.
+    """
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.removeprefix("export ").strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+if "pytest" not in sys.modules:
+    _load_dotenv(Path(os.getenv("CARECHAT_ENV_FILE", Path(__file__).resolve().parents[1] / ".env")))
 
 
 def _bool(name: str, default: bool) -> bool:
