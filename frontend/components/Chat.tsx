@@ -68,7 +68,9 @@ export default function Chat({
   const endRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<any>(null);
 
-  useEffect(() => setCanListen(!!getRecognition()), []);
+  useEffect(() => {
+    setCanListen(!!getRecognition());
+  }, []);
 
   useEffect(() => {
     if (historyEnabled && reportId) {
@@ -93,7 +95,10 @@ export default function Chat({
     }
   }, [turns, busy, storeKey]);
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [turns]);
+  // Newer browsers make scrollIntoView return a Promise, so keep it out of the return value.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [turns]);
 
   async function ask(question: string) {
     question = question.trim();

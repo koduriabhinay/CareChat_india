@@ -64,7 +64,9 @@ export function storedLang(): string {
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState("en");
 
-  useEffect(() => setLangState(storedLang()), []);
+  useEffect(() => {
+    setLangState(storedLang());
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = lang;

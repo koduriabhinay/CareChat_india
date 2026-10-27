@@ -147,7 +147,9 @@ export function SpeakButton({ text, lang }: { text: string; lang: string }) {
   const { t } = useI18n();
   const [speaking, setSpeaking] = useState(false);
   const [supported, setSupported] = useState(false);
-  useEffect(() => setSupported(typeof window !== "undefined" && "speechSynthesis" in window), []);
+  useEffect(() => {
+    setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+  }, []);
   useEffect(() => () => { if (supported) window.speechSynthesis.cancel(); }, [supported]);
   if (!supported || !text) return null;
   function toggle() {
