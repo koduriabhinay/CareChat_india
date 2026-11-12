@@ -1,6 +1,6 @@
 """CareChat API server.
 
-Runs locally with uvicorn, and on Zoho Catalyst AppSail (see catalyst/README).
+Runs locally with uvicorn, and on Zoho Catalyst AppSail (see deploy/README.md).
 """
 
 from __future__ import annotations

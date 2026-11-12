@@ -1,5 +1,7 @@
 # CareChat
 
+[![CI](https://github.com/koduriabhinay/CareChat_india/actions/workflows/ci.yml/badge.svg)](https://github.com/koduriabhinay/CareChat_india/actions/workflows/ci.yml)
+
 CareChat helps people in India understand their lab reports in plain language, in their own
 language. It explains and teaches. It never diagnoses or prescribes.
 
@@ -59,6 +61,9 @@ Web app (Next.js, static files) ──> API (FastAPI on Zoho Catalyst AppSail) �
 | `frontend/` | Web app; `locales/` holds the screen text per language |
 | `deploy/` | Zoho Catalyst config and build script |
 
+Each of `backend/`, `frontend/` and `deploy/` has its own short README with the commands for that
+part.
+
 ## Try it on your computer (no API key needed)
 
 You need Python 3.11+ and Node 20+.
@@ -66,7 +71,7 @@ You need Python 3.11+ and Node 20+.
 ```bash
 # 1. API with a stand-in for Claude (canned answers, no cost)
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 python -m scripts.offline_demo          # http://localhost:8000
 
@@ -108,8 +113,9 @@ data centre.
    (Settings > Limits), as a second guard behind CareChat's own budget.
 2. **Zoho account** with Catalyst, created in the **India data centre** (catalyst.zoho.in).
 3. **Catalyst CLI:** `npm install -g zcatalyst-cli`, then `catalyst login`.
-4. **A GitHub repository** for this code (optional but recommended). A workflow in
-   `.github/workflows/ci.yml` runs the tests on every push.
+4. **This GitHub repository** (https://github.com/koduriabhinay/CareChat_india). The workflow in
+   `.github/workflows/ci.yml` runs the backend tests and the web app type check and build on every
+   push.
 5. Optional: a **Google OAuth client id** (Google Cloud console > APIs & Services > Credentials >
    OAuth client, type Web) for "Sign in with Google", and a **Zoho Mail** address with an app
    password for sign-in codes and reminder emails.
@@ -213,3 +219,8 @@ These are engineering notes, not legal advice.
 - **Evaluation.** Grow the evaluation sets with more Indian-language cases and real Indian report
   layouts, and have a clinician review a sample of answers (the admin page collects
   thumbs-down answers for this).
+
+## License
+
+MIT, see [LICENSE](LICENSE). MedlinePlus content loaded into the knowledge base follows
+MedlinePlus's own reuse terms.
