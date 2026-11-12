@@ -9,3 +9,10 @@ frontend/next-env.d.ts
 frontend/.env.local
 build/
 frontend/out/
+*.tsbuildinfo
+.catalystrc
+.env.*
+!.env.example
+*.log
+node_modules/
+.DS_Store
