@@ -1,0 +1,11 @@
+# MedlinePlus lab test pages (check each one still loads). Add more from https://medlineplus.gov/lab-tests/
+https://medlineplus.gov/lab-tests/complete-blood-count-cbc/
+https://medlineplus.gov/lab-tests/comprehensive-metabolic-panel-cmp/
+https://medlineplus.gov/lab-tests/basic-metabolic-panel-bmp/
+https://medlineplus.gov/lab-tests/cholesterol-levels/
+https://medlineplus.gov/lab-tests/hemoglobin-a1c-hba1c-test/
+https://medlineplus.gov/lab-tests/thyroid-stimulating-hormone-tsh-test/
+https://medlineplus.gov/lab-tests/liver-function-tests/
+https://medlineplus.gov/lab-tests/kidney-function-tests/
+https://medlineplus.gov/lab-tests/urinalysis/
+https://medlineplus.gov/lab-tests/vitamin-d-test/
