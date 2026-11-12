@@ -606,7 +606,7 @@ async def trends(request: Request, profile_id: str, principal: Principal = Depen
         key=lambda x: x["date"],
     )
     series = build_trends(timeline)
-    changed = [s for s in series if s["change"] is not None]
+    changed = [s for s in series if s["change"] is not None and s["change"]["direction"] != "same"]
     return {
         "timeline": [{k: v for k, v in t.items() if k != "rows"} for t in reversed(timeline)],
         "series": series,
@@ -722,8 +722,10 @@ def _since(days: int) -> str:
 
 @router.get("/admin/metrics")
 async def admin_metrics(request: Request, days: int = 30, principal: Principal = Depends(require_admin)) -> dict:
+    from .jobs import _tasks
+
     hours = repo_of(request).metrics_since(_since(days))
-    return summarize(hours, metrics.snapshot(), days)
+    return {**summarize(hours, metrics.snapshot(), days), "queue": {"reports_reading": len(_tasks)}}
 
 
 @router.get("/admin/consents")

@@ -1,0 +1,11 @@
+{
+  "client": {
+    "source": "client"
+  },
+  "appsail": [
+    {
+      "name": "carechatapi",
+      "source": "appsail"
+    }
+  ]
+}

@@ -126,7 +126,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--topics-xml")
     parser.add_argument("--urls")
-    parser.add_argument("--db", default=settings.db_path)
+    parser.add_argument("--db", default=settings.knowledge_path)
     args = parser.parse_args()
     if not args.topics_xml and not args.urls:
         parser.error("give --topics-xml or --urls")
