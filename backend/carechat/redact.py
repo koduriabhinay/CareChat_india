@@ -96,3 +96,32 @@ def pdf_text(data: bytes) -> str:
         return "\n\n".join((page.extract_text() or "") for page in reader.pages)
     except (PdfReadError, ValueError, KeyError, TypeError):
         return ""
+
+
+_NAME_LABEL_RE = re.compile(
+    r"(?im)(?<![A-Za-z])(?:patient(?:'s)? name|pt\.? name|patient|name)\s*[:\-]\s*(.+?)(?=\s{2,}|\s*\||\s*\t|$)"
+)
+_TITLE_RE = re.compile(r"^(?:Mr|Mrs|Ms|Miss|Master|Baby|Dr|Smt|Shri|Kumari)\.?\s+", re.I)
+
+
+def printed_name(text: str) -> str | None:
+    """The patient name printed on a report, read locally to suggest whose report it is.
+
+    It is used only on our server to match a family profile and is never sent to Claude.
+    """
+    m = _NAME_LABEL_RE.search(text)
+    if not m:
+        return None
+    name = _TITLE_RE.sub("", m.group(1).strip())
+    name = re.split(r"\s+(?:age|sex|gender)\b", name, flags=re.I)[0].strip(" ,;")
+    return name or None
+
+
+def redact_names(text: str, names: list[str]) -> str:
+    """Remove known names (the account's profile names) wherever they appear, even unlabelled."""
+    for name in sorted({n.strip() for n in names if n and len(n.strip()) >= 3}, key=len, reverse=True):
+        text = re.sub(re.escape(name), REDACTED, text, flags=re.I)
+        for part in name.split():
+            if len(part) >= 4:
+                text = re.sub(rf"\b{re.escape(part)}\b", REDACTED, text, flags=re.I)
+    return text

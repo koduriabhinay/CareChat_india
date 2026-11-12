@@ -44,6 +44,7 @@ class FakeClient:
         self.answer_chunks = ["Hello", " there."]
         self.answer_stop = "end_turn"
         self.report: Any = None
+        self.summary: Any = None
         self.calls: list[tuple[str, dict]] = []
 
         async def safety_parse(**kwargs):
@@ -55,6 +56,10 @@ class FakeClient:
             )
 
         async def report_parse(**kwargs):
+            # Report extraction and the first summary share this call; route by the requested shape.
+            if kwargs["output_format"].__name__ == "Summary":
+                self.calls.append(("summary", kwargs))
+                return SimpleNamespace(stop_reason="end_turn", parsed_output=self.summary)
             self.calls.append(("report", kwargs))
             return SimpleNamespace(stop_reason="end_turn", parsed_output=self.report)
 
@@ -69,18 +74,38 @@ class FakeClient:
 @pytest.fixture
 def fake_client(monkeypatch):
     client = FakeClient()
-    for module in ("carechat.safety", "carechat.chat", "carechat.reports"):
+    for module in ("carechat.safety", "carechat.chat", "carechat.reports", "carechat.summary"):
         monkeypatch.setattr(f"{module}.get_client", lambda: client)
     return client
 
 
-@pytest.fixture
-def db_path(tmp_path):
-    """Point the app at a throwaway database for one test."""
+def _set(name: str, value):
     from carechat import config
 
+    original = getattr(config.settings, name)
+    object.__setattr__(config.settings, name, value)
+    return original
+
+
+@pytest.fixture
+def db_path(tmp_path):
+    """Point the app at throwaway databases and fresh in-memory counters for one test."""
+    from carechat import metrics, ratelimit
+
     path = str(tmp_path / "test.db")
-    original = config.settings.db_path
-    object.__setattr__(config.settings, "db_path", path)
+    changed = {
+        "db_path": path,
+        "knowledge_path": str(tmp_path / "knowledge.db"),
+        "store_backend": "sqlite",
+        "auth_mode": "dev",
+        "mail_backend": "console",
+        "run_inprocess_jobs": False,
+        "cron_token": "cron-secret",
+        "admin_emails": ("admin@example.com",),
+    }
+    originals = {k: _set(k, v) for k, v in changed.items()}
+    metrics.metrics.__init__()
+    ratelimit.limits.__init__()
     yield path
-    object.__setattr__(config.settings, "db_path", original)
+    for k, v in originals.items():
+        _set(k, v)

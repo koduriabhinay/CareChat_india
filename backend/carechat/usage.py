@@ -29,6 +29,9 @@ def usage_dict(usage: Any) -> dict[str, int]:
 
 def log_usage(call: str, model: str, usage: Any) -> dict[str, int]:
     counts = usage_dict(usage)
+    from .metrics import metrics  # local import: metrics imports settings only
+
+    metrics.tokens_used(call, model, counts)
     log.info(
         "tokens call=%s model=%s input=%d cache_read=%d cache_write=%d output=%d",
         call, model, counts["input"], counts["cache_read"], counts["cache_write"], counts["output"],

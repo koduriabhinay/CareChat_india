@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from carechat.chat import ChatMessage, ChatRequest, TRIM_NOTE, build_messages, build_system
 from carechat.config import settings
 from carechat.knowledge import Passage
-from carechat.reports import Report, compact_text
+from carechat.reports import compact_text
 from carechat.usage import log_usage
 
 CACHE = {"type": "ephemeral"}
@@ -18,8 +18,8 @@ def convo(n_pairs: int, answer: str = "ok") -> list[ChatMessage]:
 
 
 def test_system_prompt_and_report_are_cached():
-    blocks = build_system(Report(is_medical_report=True))
-    assert len(blocks) == 2 and all(b["cache_control"] == CACHE for b in blocks)
+    blocks = build_system("HbA1c | 6.1 | % | 4.0-5.6 | high", "Diet type: vegetarian")
+    assert len(blocks) == 2 and "<person>" in blocks[1]["text"] and all(b["cache_control"] == CACHE for b in blocks)
     assert len(build_system(None)) == 1
 
 
