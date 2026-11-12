@@ -506,3 +506,69 @@ def test_hourly_job_needs_token(api):
     assert api.post("/api/internal/hourly").status_code == 403
     r = api.post("/api/internal/hourly", headers={"X-Cron-Token": "cron-secret"})
     assert r.status_code == 200 and "purged" in r.json()
+
+
+# --- mobile number sign-in ------------------------------------------------------------
+
+def phone_sign_in(api, phone="98765 43210", guest_token=None):
+    start = api.post("/api/auth/phone/start", json={"phone": phone})
+    assert start.status_code == 200, start.text
+    r = api.post("/api/auth/phone/verify", json={"phone": phone, "code": start.json()["dev_code"], "guest_token": guest_token})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
+def test_phone_sign_in(api):
+    assert api.get("/api/health").json()["phone_sign_in"] is True
+    h = phone_sign_in(api, "+91 98765 43210")
+    me = api.get("/api/me", headers=h).json()
+    assert me["phone"] == "+919876543210" and me["email"] is None and me["role"] == "patient"
+    # The same number in another format reaches the same account.
+    assert api.get("/api/me", headers=phone_sign_in(api, "09876543210")).json()["id"] == me["id"]
+
+
+def test_phone_rejects_bad_numbers_and_codes(api):
+    for bad in ("12345", "5876543210", "+1 415 555 0100"):
+        assert api.post("/api/auth/phone/start", json={"phone": bad}).status_code == 422
+    api.post("/api/auth/phone/start", json={"phone": "9876543210"})
+    assert api.post("/api/auth/phone/verify", json={"phone": "9876543210", "code": "000000"}).status_code == 400
+
+
+def test_phone_codes_are_limited_per_number_and_per_day(api):
+    from carechat import config
+
+    for _ in range(3):
+        assert api.post("/api/auth/phone/start", json={"phone": "9876500001"}).status_code == 200
+    assert api.post("/api/auth/phone/start", json={"phone": "9876500001"}).status_code == 429
+    object.__setattr__(config.settings, "daily_sms_cap", 3)
+    try:
+        assert api.post("/api/auth/phone/start", json={"phone": "9876500002"}).status_code == 429
+    finally:
+        object.__setattr__(config.settings, "daily_sms_cap", 100)
+
+
+def test_phone_sign_in_keeps_guest_data(api):
+    guest = api.post("/api/auth/guest", json={}).json()["token"]
+    gh = {"Authorization": f"Bearer {guest}"}
+    consent(api, gh)
+    pid = api.post("/api/profiles", headers=gh, json={"display_name": "Me"}).json()["id"]
+    h = phone_sign_in(api, guest_token=guest)
+    assert [p["id"] for p in api.get("/api/profiles", headers=h).json()] == [pid]
+
+
+def test_phone_only_reminders_are_in_app(api):
+    h = phone_sign_in(api)
+    consent(api, h)
+    r = api.post("/api/reminders", headers=h, json={"title": "Tablet", "schedule": {"type": "daily", "time": "08:00"}})
+    assert r.json()["email"] is False
+
+
+def test_phone_sign_in_off(api):
+    from carechat import config
+
+    object.__setattr__(config.settings, "sms_backend", "off")
+    try:
+        assert api.get("/api/health").json()["phone_sign_in"] is False
+        assert api.post("/api/auth/phone/start", json={"phone": "9876543210"}).status_code == 404
+    finally:
+        object.__setattr__(config.settings, "sms_backend", "console")

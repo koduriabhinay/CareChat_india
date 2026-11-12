@@ -119,10 +119,14 @@ export default function Reminders() {
               </div>
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="h-5 w-5 accent-teal-700" checked={form.email} onChange={(e) => setForm({ ...form, email: e.target.checked })} />
-            {t("email_me", { email: me.email ?? "" })}
-          </label>
+          {me.email ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="h-5 w-5 accent-teal-700" checked={form.email} onChange={(e) => setForm({ ...form, email: e.target.checked })} />
+              {t("email_me", { email: me.email })}
+            </label>
+          ) : (
+            <p className="text-xs text-slate-600 dark:text-slate-400">{t("reminders_in_app_only")}</p>
+          )}
           <p className="text-xs text-slate-600 dark:text-slate-400">{t("reminder_safety_note")}</p>
           <ErrorBox message={error} />
           <button className={btnPrimary}>{t("add_reminder")}</button>
