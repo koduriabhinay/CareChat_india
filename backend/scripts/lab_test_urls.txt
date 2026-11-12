@@ -4,8 +4,12 @@ https://medlineplus.gov/lab-tests/comprehensive-metabolic-panel-cmp/
 https://medlineplus.gov/lab-tests/basic-metabolic-panel-bmp/
 https://medlineplus.gov/lab-tests/cholesterol-levels/
 https://medlineplus.gov/lab-tests/hemoglobin-a1c-hba1c-test/
-https://medlineplus.gov/lab-tests/thyroid-stimulating-hormone-tsh-test/
+https://medlineplus.gov/lab-tests/tsh-thyroid-stimulating-hormone-test/
 https://medlineplus.gov/lab-tests/liver-function-tests/
-https://medlineplus.gov/lab-tests/kidney-function-tests/
-https://medlineplus.gov/lab-tests/urinalysis/
+https://medlineplus.gov/lab-tests/bun-blood-urea-nitrogen/
+https://medlineplus.gov/lab-tests/creatinine-test/
+https://medlineplus.gov/lab-tests/estimated-glomerular-filtration-rate-egfr-and-gfr-tests/
+# MedlinePlus has no urinalysis lab test page; this is its health topic page plus urine protein.
+https://medlineplus.gov/urinalysis.html
+https://medlineplus.gov/lab-tests/protein-in-urine/
 https://medlineplus.gov/lab-tests/vitamin-d-test/

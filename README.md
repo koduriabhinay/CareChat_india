@@ -81,14 +81,19 @@ Sign in with any email using "Test sign-in". To see the admin dashboard, start t
 `CARECHAT_ADMIN_EMAILS=you@example.com`.
 
 To use real Claude, copy `backend/.env.example` to `backend/.env`, fill it in, load the reference
-pages once, and run the real server:
+pages once, and run the real server. Run these inside the `.venv` you made above:
 
 ```bash
 cd backend
-set -a && source .env && set +a
+source .venv/bin/activate
 python -m scripts.ingest_medlineplus --urls scripts/lab_test_urls.txt
-uvicorn carechat.main:app --reload --port 8000
+set -a && source .env && set +a          # loads your API key and settings
+python -m uvicorn carechat.main:app --reload --port 8000
 ```
+
+Use `python -m uvicorn`, not plain `uvicorn`: with Conda (or another Python) active, plain
+`uvicorn` can start a different Python that doesn't have CareChat's packages, and fails with
+"No module named 'httpx'".
 
 ## Put it online on Zoho Catalyst (free student tier)
 

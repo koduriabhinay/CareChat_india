@@ -45,11 +45,12 @@ class _TextExtractor(HTMLParser):
         self._skip_depth = 0
         self.title = ""
         self._in_title = False
+        self._title_done = False  # icons carry their own <title> ("Lock"); keep the page's
 
     def handle_starttag(self, tag, attrs):
         if tag in self.SKIP:
             self._skip_depth += 1
-        elif tag == "title":
+        elif tag == "title" and not self._title_done:
             self._in_title = True
         elif tag in self.BLOCK and not self._skip_depth:
             self.parts.append("\n\n")
@@ -57,8 +58,9 @@ class _TextExtractor(HTMLParser):
     def handle_endtag(self, tag):
         if tag in self.SKIP and self._skip_depth:
             self._skip_depth -= 1
-        elif tag == "title":
+        elif tag == "title" and self._in_title:
             self._in_title = False
+            self._title_done = True
 
     def handle_data(self, data):
         if self._in_title:
