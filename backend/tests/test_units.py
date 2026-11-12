@@ -142,3 +142,23 @@ def _run_message_central_checks(sms, calls):
         raise AssertionError("expected SmsError")
     except sms.SmsError as exc:
         assert "Too many codes" in str(exc)
+
+
+def test_dotenv_loader(tmp_path, monkeypatch):
+    """backend/.env is read without `source`, including values with spaces and <>."""
+    from carechat.config import _load_dotenv
+
+    env = tmp_path / ".env"
+    env.write_text('# comment\nCC_T_FROM=CareChat <no-reply@example.com>\nCC_T_KEY="abc"\nexport CC_T_X=1\nCC_T_SET=file\n')
+    for k in ("CC_T_FROM", "CC_T_KEY", "CC_T_X"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("CC_T_SET", "shell")
+    _load_dotenv(env)
+    import os
+
+    assert os.environ["CC_T_FROM"] == "CareChat <no-reply@example.com>"
+    assert os.environ["CC_T_KEY"] == "abc"
+    assert os.environ["CC_T_X"] == "1"
+    assert os.environ["CC_T_SET"] == "shell"  # the shell wins over the file
+    for k in ("CC_T_FROM", "CC_T_KEY", "CC_T_X"):
+        os.environ.pop(k, None)
