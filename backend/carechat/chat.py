@@ -17,6 +17,7 @@ from .redact import redact_identifiers
 from .reports import Report
 from .languages import LANGUAGES, language_name
 from .safety import REGION, Verdict, fixed_message, screen
+from .usage import log_usage
 
 log = logging.getLogger(__name__)
 
@@ -64,15 +65,49 @@ def format_sources(passages: list[Passage]) -> str:
     )
 
 
-def build_messages(request: ChatRequest, report: Report | None, passages: list[Passage]) -> list[dict[str, Any]]:
+CACHE = {"type": "ephemeral"}
+TRIM_NOTE = " [earlier answer trimmed]"
+
+
+def _history_text(m: ChatMessage) -> str:
+    """Trim long past answers. Depends only on the message itself, so the result is
+    the same on every request and the cached prefix stays valid."""
+    limit = settings.max_assistant_chars_in_history
+    if m.role == "assistant" and len(m.content) > limit:
+        return m.content[:limit] + TRIM_NOTE
+    return m.content
+
+
+def build_system(report: Report | None) -> list[dict[str, Any]]:
+    """Fixed instructions, then the report, each cached.
+
+    The report sits in the system prompt rather than in each question so it is
+    sent once per conversation and read from cache on every follow-up.
+    """
+    blocks: list[dict[str, Any]] = [{"type": "text", "text": ANSWER_SYSTEM, "cache_control": CACHE}]
+    if report is not None:
+        blocks.append(
+            {
+                "type": "text",
+                "text": f"The user's uploaded report (identifiers removed):\n<report>\n{format_report(report)}\n</report>",
+                "cache_control": CACHE,
+            }
+        )
+    return blocks
+
+
+def build_messages(request: ChatRequest, passages: list[Passage]) -> list[dict[str, Any]]:
     history = request.messages[-settings.max_history_messages :]
     # The API needs the conversation to start with a user turn.
     while history and history[0].role != "user":
         history = history[1:]
-    messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in history[:-1]]
+    messages: list[dict[str, Any]] = [{"role": m.role, "content": _history_text(m)} for m in history[:-1]]
+    if messages:
+        # Cache breakpoint at the end of the earlier conversation. The next request
+        # repeats this prefix exactly, so it is read from cache at a tenth of the price.
+        last = messages[-1]
+        last["content"] = [{"type": "text", "text": last["content"], "cache_control": CACHE}]
     parts = []
-    if report is not None:
-        parts.append(f"<report>\n{format_report(report)}\n</report>")
     if passages:
         parts.append(f"<sources>\n{format_sources(passages)}\n</sources>")
     name = language_name(request.language)
@@ -112,7 +147,7 @@ async def answer(
         yield {"type": "done"}
         return
 
-    passages = kb.search(user_texts[-1])
+    passages = kb.search(user_texts[-1], k=settings.max_sources)
     yield {
         "type": "sources",
         "sources": [{"index": i, "title": p.title, "url": p.url} for i, p in enumerate(passages, start=1)],
@@ -124,15 +159,16 @@ async def answer(
     try:
         async with get_client().beta.messages.stream(
             model=settings.answer_model,
-            max_tokens=8000,
-            system=ANSWER_SYSTEM,
+            max_tokens=settings.answer_max_tokens,
+            system=build_system(report),
             output_config={"effort": "low"},
-            messages=build_messages(request, report, passages),
+            messages=build_messages(request, passages),
             **kwargs,
         ) as stream:
             async for text in stream.text_stream:
                 yield {"type": "text", "text": text}
             final = await stream.get_final_message()
+        log_usage("answer", settings.answer_model, getattr(final, "usage", None))
     except anthropic.APIError:
         log.exception("Answer model call failed")
         yield {"type": "error", "message": ERROR_MESSAGE}

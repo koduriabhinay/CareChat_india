@@ -87,6 +87,17 @@ messages use 112 (108 for an ambulance) and Tele-MANAS (14416). `CARECHAT_REGION
 (`fallbacks: "default"`) are on. Fallbacks work on the Claude API only; set
 `CARECHAT_USE_FALLBACKS=false` on Bedrock or Vertex.
 
+## Token use
+
+- **Prompt caching:** the fixed instructions and the user's report sit in cached system blocks,
+  and the earlier conversation is cached up to the latest question. Follow-ups read them at
+  about a tenth of the normal input price.
+- **Smaller inputs:** last 12 messages only, past answers over 2,000 characters trimmed, top 3
+  sources, and report text with layout spacing squeezed out before extraction.
+- **Output caps:** 3,000 tokens per answer, 8,000 for report extraction, 1,024 for the safety check.
+- **Logging:** every Claude call logs `tokens call=... input=... cache_read=... cache_write=... output=...`
+  under the `carechat.tokens` logger, so cost and cache hit rate can be tracked.
+
 ## Before real patients use it (India launch)
 
 These are engineering notes, not legal advice. Have a lawyer familiar with Indian health and data
