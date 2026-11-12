@@ -14,7 +14,7 @@ from .knowledge import KnowledgeBase, Passage
 from .llm import FALLBACK_BETA, get_client
 from .prompts import ANSWER_SYSTEM
 from .reports import Report
-from .safety import FIXED_MESSAGES, Verdict, screen
+from .safety import FIXED_MESSAGES, REGION, Verdict, screen
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,8 @@ async def answer(
     user_texts = [m.content for m in request.messages if m.role == "user"]
     verdict = await screen(user_texts)
     if verdict is not Verdict.OK:
-        yield {"type": "safety", "verdict": verdict.value, "message": FIXED_MESSAGES[verdict]}
+        call = REGION.crisis_number if verdict is Verdict.SELF_HARM else REGION.emergency_number
+        yield {"type": "safety", "verdict": verdict.value, "message": FIXED_MESSAGES[verdict], "call": call}
         yield {"type": "done"}
         return
 
