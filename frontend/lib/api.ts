@@ -55,6 +55,17 @@ export async function getHealth(): Promise<Health> {
   return res.json();
 }
 
+export interface Language {
+  code: string;
+  name: string;
+}
+
+export async function getLanguages(): Promise<Language[]> {
+  const res = await fetch(`${API_URL}/api/languages`);
+  if (!res.ok) throw new Error(await errorDetail(res));
+  return res.json();
+}
+
 export async function uploadReport(file: File): Promise<{ report_id: string; report: Report }> {
   const form = new FormData();
   form.append("file", file);
@@ -72,13 +83,14 @@ export async function deleteReport(reportId: string): Promise<void> {
 export async function streamChat(
   messages: { role: "user" | "assistant"; content: string }[],
   reportId: string | null,
+  language: string,
   onEvent: (event: ChatEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, report_id: reportId }),
+    body: JSON.stringify({ messages, report_id: reportId, language }),
     signal,
   });
   if (!res.ok || !res.body) throw new Error(await errorDetail(res));

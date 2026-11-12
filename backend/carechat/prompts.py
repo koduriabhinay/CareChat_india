@@ -36,4 +36,7 @@ from the user's own report don't need a citation.
 Style: plain words a 12-year-old could follow, short paragraphs, and define any medical term \
 you must use. Use a simple list or table when explaining several results. Keep answers brief \
 unless the user asks for more. Never invent values that are not in the report.
-If the user writes in Hindi or another language, answer in that language."""
+Language: if the user turn has <reply_language>, write your whole answer in that language and \
+its usual script. Otherwise answer in the language the user wrote in. Keep test names, numbers \
+and units exactly as printed on the report, and explain each medical term in simple words in \
+that language."""

@@ -13,8 +13,10 @@ from .config import settings
 from .knowledge import KnowledgeBase, Passage
 from .llm import FALLBACK_BETA, get_client
 from .prompts import ANSWER_SYSTEM
+from .redact import redact_identifiers
 from .reports import Report
-from .safety import FIXED_MESSAGES, REGION, Verdict, screen
+from .languages import LANGUAGES, language_name
+from .safety import REGION, Verdict, fixed_message, screen
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +35,8 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1)
     report_id: str | None = None
+    # Code from languages.LANGUAGES, e.g. "ta". None means reply in the user's language.
+    language: str | None = None
 
 
 def format_report(report: Report) -> str:
@@ -71,6 +75,9 @@ def build_messages(request: ChatRequest, report: Report | None, passages: list[P
         parts.append(f"<report>\n{format_report(report)}\n</report>")
     if passages:
         parts.append(f"<sources>\n{format_sources(passages)}\n</sources>")
+    name = language_name(request.language)
+    if name and name != "English":
+        parts.append(f"<reply_language>{name}</reply_language>")
     parts.append(f"<question>\n{history[-1].content}\n</question>")
     messages.append({"role": "user", "content": "\n\n".join(parts)})
     return messages
@@ -78,6 +85,8 @@ def build_messages(request: ChatRequest, report: Report | None, passages: list[P
 
 def validate_request(request: ChatRequest) -> str | None:
     """Return an error message for a malformed conversation, or None."""
+    if request.language is not None and request.language not in LANGUAGES:
+        return "Unknown language."
     if request.messages[-1].role != "user":
         return "The last message must come from the user."
     if any(len(m.content) > settings.max_message_chars for m in request.messages):
@@ -89,11 +98,17 @@ async def answer(
     request: ChatRequest, report: Report | None, kb: KnowledgeBase
 ) -> AsyncIterator[dict[str, Any]]:
     """Yield events: safety, sources, text deltas, then done."""
+    # Strip phone numbers, emails and ID numbers before anything is sent to Claude.
+    request = ChatRequest(
+        messages=[ChatMessage(role=m.role, content=redact_identifiers(m.content)) for m in request.messages],
+        report_id=request.report_id,
+        language=request.language,
+    )
     user_texts = [m.content for m in request.messages if m.role == "user"]
     verdict = await screen(user_texts)
     if verdict is not Verdict.OK:
         call = REGION.crisis_number if verdict is Verdict.SELF_HARM else REGION.emergency_number
-        yield {"type": "safety", "verdict": verdict.value, "message": FIXED_MESSAGES[verdict], "call": call}
+        yield {"type": "safety", "verdict": verdict.value, "message": fixed_message(verdict, request.language), "call": call}
         yield {"type": "done"}
         return
 

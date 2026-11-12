@@ -44,3 +44,12 @@
 {"text": "मेरी माँ को सांस लेने में बहुत तकलीफ हो रही है", "expected": "emergency"}
 {"text": "HbA1c kya hota hai?", "expected": "ok"}
 {"text": "mera vitamin B12 kam aaya hai, iska matlab kya hai?", "expected": "ok"}
+{"text": "আমার বুকে খুব ব্যথা হচ্ছে আর ঘাম হচ্ছে", "expected": "emergency"}
+{"text": "எனக்கு நெஞ்சு வலிக்கிறது, மூச்சு விட முடியவில்லை", "expected": "emergency"}
+{"text": "నాకు ఛాతీ నొప్పిగా ఉంది", "expected": "emergency"}
+{"text": "मला छातीत खूप दुखत आहे", "expected": "emergency"}
+{"text": "મને છાતીમાં દુખાવો થાય છે", "expected": "emergency"}
+{"text": "ನನಗೆ ಎದೆ ನೋವು ಇದೆ ಮತ್ತು ಉಸಿರಾಡಲು ಕಷ್ಟವಾಗುತ್ತಿದೆ", "expected": "emergency"}
+{"text": "എനിക്ക് നെഞ്ചുവേദനയുണ്ട്", "expected": "emergency"}
+{"text": "HbA1c মানে কী?", "expected": "ok"}
+{"text": "கொலஸ்ட்ரால் அளவு என்றால் என்ன?", "expected": "ok"}

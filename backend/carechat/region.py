@@ -6,7 +6,7 @@ Numbers must be re-checked with official sources before launch.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,14 @@ class Region:
     self_harm_message: str
     unavailable_message: str
     disclaimer: str
+    # Fixed messages in other languages: code -> (emergency, self_harm, unavailable).
+    # Each must be written or checked by a native speaker before launch.
+    translations: dict[str, tuple[str, str, str]] = field(default_factory=dict)
+
+    def messages(self, language: str | None) -> tuple[str, str, str]:
+        if language and language in self.translations:
+            return self.translations[language]
+        return (self.emergency_message, self.self_harm_message, self.unavailable_message)
 
 
 INDIA = Region(
@@ -46,6 +54,21 @@ INDIA = Region(
         "CareChat is for education only and is not medical advice. "
         "It can't diagnose or treat. In an emergency, call 112."
     ),
+    translations={
+        # Draft Hindi: needs review by a native speaker before launch.
+        "hi": (
+            "आपके संदेश में ऐसे लक्षण बताए गए हैं जो मेडिकल इमरजेंसी हो सकते हैं। "
+            "कृपया अभी 112 पर कॉल करें (एम्बुलेंस के लिए 108), या नज़दीकी अस्पताल के इमरजेंसी विभाग में जाएं। "
+            "ऑनलाइन जवाब का इंतज़ार न करें। अगर आपको यकीन नहीं है कि यह इमरजेंसी है, तब भी कॉल करें। "
+            "CareChat इमरजेंसी में मदद नहीं कर सकता।",
+            "ऐसा लगता है कि आप बहुत मुश्किल दौर से गुज़र रहे हैं, और आपको इसका सामना अकेले नहीं करना है। "
+            "आप Tele-MANAS को 14416 (या 1-800-891-4416) पर कॉल कर सकते हैं। यह मुफ़्त है, 24 घंटे उपलब्ध है, "
+            "और आप अपनी भाषा में प्रशिक्षित काउंसलर से बात कर सकते हैं। "
+            "अगर आप तुरंत खतरे में हैं, तो कृपया अभी 112 पर कॉल करें।",
+            "CareChat अभी सुरक्षा के लिए संदेशों की जाँच नहीं कर पा रहा है, इसलिए जवाब नहीं दे सकता। "
+            "अगर यह इमरजेंसी हो सकती है, तो 112 पर कॉल करें। वरना कुछ मिनट बाद फिर कोशिश करें।",
+        ),
+    },
 )
 
 US = Region(

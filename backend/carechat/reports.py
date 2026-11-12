@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import logging
 from typing import Literal
 
@@ -11,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .config import settings
 from .llm import FALLBACK_BETA, get_client
+from .redact import pdf_text, redact
 
 log = logging.getLogger(__name__)
 
@@ -36,12 +36,15 @@ class Report(BaseModel):
     )
 
 
-EXTRACT_SYSTEM = """You read medical reports and copy their contents into a structured form.
+EXTRACT_SYSTEM = """You read the text of medical reports and copy their contents into a structured form.
+Identifiers have already been replaced with [REDACTED]; leave them out.
 Copy names, values, units, ranges and flags exactly as printed. Never compute, guess or correct \
 a value, and never add a flag the report does not show. Leave out names, addresses, phone \
 numbers, record numbers and other identifiers of the patient or clinicians."""
 
 PDF_MAGIC = b"%PDF-"
+# Below this many characters of text we treat the PDF as a scan.
+MIN_TEXT_CHARS = 40
 
 
 class ReportError(Exception):
@@ -59,6 +62,13 @@ def validate_pdf(data: bytes) -> None:
 
 async def extract_report(pdf_bytes: bytes) -> Report:
     validate_pdf(pdf_bytes)
+    # Read the PDF here and send Claude only redacted text, never the file.
+    text = pdf_text(pdf_bytes)
+    if len(text.strip()) < MIN_TEXT_CHARS:
+        raise ReportError(
+            "This PDF looks like a scan or photo, which CareChat can't read yet. "
+            "Please upload the PDF your lab sent you by email or app."
+        )
     kwargs = {}
     if settings.use_fallbacks:
         kwargs = {"betas": [FALLBACK_BETA], "fallbacks": "default"}
@@ -71,17 +81,7 @@ async def extract_report(pdf_bytes: bytes) -> Report:
             messages=[
                 {
                     "role": "user",
-                    "content": [
-                        {
-                            "type": "document",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "application/pdf",
-                                "data": base64.standard_b64encode(pdf_bytes).decode("ascii"),
-                            },
-                        },
-                        {"type": "text", "text": "Extract this report."},
-                    ],
+                    "content": f"<report_text>\n{redact(text)}\n</report_text>\n\nExtract this report.",
                 }
             ],
             output_format=Report,

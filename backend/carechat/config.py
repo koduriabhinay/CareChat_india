@@ -23,6 +23,8 @@ class Settings:
     region_code: str = field(default_factory=lambda: os.getenv("CARECHAT_REGION", "IN"))
     db_path: str = field(default_factory=lambda: os.getenv("CARECHAT_DB_PATH", "carechat.db"))
     max_upload_bytes: int = field(default_factory=lambda: int(os.getenv("CARECHAT_MAX_UPLOAD_MB", "10")) * 1024 * 1024)
+    # Extracted reports are deleted automatically after this many hours.
+    report_retention_hours: float = field(default_factory=lambda: float(os.getenv("CARECHAT_REPORT_RETENTION_HOURS", "24")))
     max_history_messages: int = 20
     max_message_chars: int = 4000
     allowed_origins: tuple[str, ...] = field(

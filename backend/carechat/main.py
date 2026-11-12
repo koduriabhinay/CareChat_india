@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from . import chat, reports
 from .config import settings
 from .knowledge import KnowledgeBase
+from .languages import LANGUAGES
 from .safety import REGION
 from .store import ReportStore
 
@@ -25,8 +27,19 @@ DISCLAIMER = REGION.disclaimer
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.kb = KnowledgeBase(settings.db_path)
-    app.state.reports = ReportStore(settings.db_path)
+    app.state.reports = ReportStore(settings.db_path, settings.report_retention_hours)
+
+    async def purge_loop() -> None:
+        # Expired reports are already unreadable; this also removes them from disk.
+        while True:
+            await asyncio.sleep(600)
+            app.state.reports.purge_expired()
+
+    task = asyncio.create_task(purge_loop())
     yield
+    task.cancel()
+    with suppress(asyncio.CancelledError):
+        await task
 
 
 app = FastAPI(title="CareChat API", lifespan=lifespan)
@@ -48,6 +61,11 @@ async def health(request: Request) -> dict:
         "emergency_number": REGION.emergency_number,
         "crisis_number": REGION.crisis_number,
     }
+
+
+@app.get("/api/languages")
+async def languages() -> list[dict]:
+    return [{"code": code, "name": name} for code, name in LANGUAGES.items()]
 
 
 @app.post("/api/reports")
@@ -81,7 +99,10 @@ async def chat_endpoint(request: Request, body: chat.ChatRequest) -> StreamingRe
     if body.report_id:
         report = request.app.state.reports.get(body.report_id)
         if report is None:
-            raise HTTPException(status_code=404, detail="Report not found. Please upload it again.")
+            raise HTTPException(
+                status_code=404,
+                detail="Report not found. Reports are deleted after 24 hours, so please upload it again.",
+            )
 
     async def events() -> AsyncIterator[str]:
         async for event in chat.answer(body, report, request.app.state.kb):
