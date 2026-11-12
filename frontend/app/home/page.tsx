@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, type Profile, type Reminder, type ReportOut } from "@/lib/api";
 import { useGuard } from "@/lib/app";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type TKey } from "@/lib/i18n";
 import DueReminders from "@/components/DueReminders";
 import { btnPrimary, btnSecondary, card, ErrorBox, PageTitle, Shell, Spinner } from "@/components/ui";
 
@@ -83,7 +83,7 @@ export default function Home() {
                 <div>
                   <h2 className="font-semibold">{p.display_name}</h2>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                    {p.is_self ? t("relation_self") : p.relation}
+                    {p.is_self ? t("relation_self") : t(`relation_${p.relation}` as TKey)}
                     {p.age != null && ` · ${t("age_years", { age: p.age })}`}
                   </p>
                 </div>
